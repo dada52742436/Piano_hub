@@ -1,72 +1,97 @@
-CampusOps：面向大学社团/活动组织者的一体化活动管理平台
+项目名称建议
 
-它不是那种“Todos、博客、电商”这种大家都做过太多次的题目，而是一个很像真实 SaaS 产品的全栈项目。它能同时展示你在 后端、前端、数据库设计、权限系统、支付、通知、监控、部署 这些方面的能力。像这种带 RBAC、支付、仪表盘、审计日志、CI/CD、错误监控 的项目，会比纯 CRUD 项目更有竞争力，因为它更接近生产环境。GitHub Actions 也很适合用来证明你会自动化测试和部署；GitHub 官方把它定位为 CI/CD 平台，可以自动构建、测试和部署代码。
+PianoHub
+副标题可以是：
 
-为什么这个题目适合你
+A marketplace and booking platform for piano services
 
-你现在想做的是“有竞争力的全栈项目”，那项目不能只停留在“能增删改查”。更加分的是：
+你也可以中文理解成：
 
-有真实业务场景
+一个面向钢琴买卖、调音、维修、搬运和老师预约的平台
 
-有多角色权限
+一、这个项目到底是在做什么
 
-有文件上传或支付
+它本质上不是单一功能网站，而是一个垂直行业平台。
 
-有管理后台和数据看板
+它解决的是钢琴行业里几个很真实的问题：
 
-有日志、监控、测试、部署
+用户端痛点
 
-RBAC 这类设计本身就是企业常见做法，Auth0 的官方文档也强调，权限策略应按角色分配，并遵循最小权限原则。
-再加上错误追踪和性能监控，Sentry 官方文档强调它可以帮助你追踪错误、分布式追踪和发布健康度，这能让你的项目明显更像“真的能上线”。
+想买二手钢琴，但信息分散在 Gumtree、Facebook、微信群
 
-这个项目解决什么问题
+想找调音师，不知道谁靠谱、价格多少
 
-很多大学社团、学生组织、小型活动主办方，实际都会遇到这些问题：
+想预约搬运或维修，流程混乱
 
-活动报名靠 Google Form，很乱
+想找钢琴老师，也没有统一入口
 
-票务、签到、名额控制分散
+商家/服务者端痛点
 
-志愿者管理混乱
+没有统一获客平台
 
-经费和收入记录不清楚
+预约流程全靠微信/电话
 
-活动结束后没有数据复盘
+客户管理混乱
 
-所以你做一个平台，支持：
+很难建立评价和信誉体系
 
-社团创建活动
+所以这个平台做的事情就是：
 
-学生报名和付款
+把“钢琴买卖 + 服务预约 + 用户评价 + 商家管理”整合成一个完整系统。
 
-管理员审核与分配志愿者
+二、为什么这个项目很适合你
 
-入场签到
+结合你现在的方向，这个项目特别适合你：
 
-活动数据分析
+你想做后端 + 部分前端
 
-财务和退款管理
+你想做一个有竞争力的全栈项目
 
-这个题目既有 B 端管理后台，也有 C 端用户界面，非常适合展示全栈能力。
+你以后想投 full-stack / backend / software engineer
 
-你应该实现的核心功能
-1. 用户与身份系统
+你平时也更适合做有真实业务逻辑的系统，而不是纯展示型项目
 
-这是必须做的基础层。
+这个项目的好处是它能同时体现：
 
-要有这些角色：
+用户认证
 
-Visitor：未登录用户
+权限管理
 
-Student/User：报名活动、付款、查看订单
+数据建模
 
-Organizer：创建活动、看报名、处理退款
+订单系统
 
-Staff/Volunteer：签到、处理现场任务
+支付系统
 
-Admin：平台管理、审核社团、查看审计日志
+搜索筛选
 
-你要实现：
+文件上传
+
+地图和区域服务
+
+消息通知
+
+后台管理
+
+这类项目比“博客系统”“待办清单”“电影网站”更有说服力。
+
+三、项目核心模块大纲
+
+我建议你把项目拆成 5个核心业务模块。
+
+1. 用户系统
+
+角色建议分成四类：
+
+Buyer / Customer：普通用户，买钢琴、预约服务
+
+Seller / Service Provider：卖家、调音师、维修师、搬运人员、老师
+
+Admin：平台管理员
+
+Guest：未登录游客
+
+主要功能
 
 注册 / 登录
 
@@ -74,269 +99,367 @@ Admin：平台管理、审核社团、查看审计日志
 
 忘记密码
 
-OAuth 登录（Google）
-
 用户资料页
 
-角色权限控制
+地址管理
 
-被禁用账号处理
+收藏功能
 
-这里最加分的不是“能登录”，而是权限边界清晰。例如：
+查看订单 / 预约记录
 
-普通用户不能看后台财务数据
+2. 二手钢琴市场模块
 
-Staff 只能看被分配的活动
+这是平台的 Marketplace 部分。
 
-Organizer 只能管理自己社团的活动
+用户可以做的事
 
-Admin 才能看全平台审计日志
+浏览钢琴列表
 
-2. 活动管理模块
+搜索品牌（Yamaha, Kawai 等）
 
-这是项目的主业务核心。
+筛选价格、类型、地区、成色
 
-Organizer 可以：
+查看钢琴详情页
 
-创建活动
+收藏商品
 
-设置活动封面、描述、时间、地点
+联系卖家
 
-设置报名截止时间
+下单或提交询价
 
-设置总名额 / 候补名单
+卖家可以做的事
 
-设置免费票 / 付费票
+发布钢琴
 
-设置是否需要审核
+上传图片
 
-设置可见性（公开 / 私密 / 仅社团成员）
+设置价格
 
-活动页要有：
+填写品牌、型号、年份、状态
 
-活动详情展示
+标记是否含搬运
 
-票种与价格
+管理上架/下架状态
 
-名额剩余
+详情页信息建议
 
-FAQ
+品牌
 
-主办方信息
+型号
 
-相似活动推荐
+类型（upright / grand）
 
-后端要处理：
+年份
 
-名额扣减
+状态
 
-并发报名保护
+调音记录
 
-报名截止校验
+是否含送货
 
-状态流转（draft / published / cancelled / completed）
+所在 suburb
 
-这里很能体现你的后端思维，因为不只是存数据，还要处理库存/名额一致性。
+图片
 
-3. 报名、订单与支付
+卖家评分
 
-这个模块会直接拉高项目含金量。
+3. 服务预约模块
 
-用户可以：
+这个是平台最核心、最有商业味道的模块。
 
-选择票种
+服务分类可以有：
 
-创建订单
+Piano Tuning
+
+Piano Repair
+
+Piano Moving
+
+Piano Lessons
+
+用户端功能
+
+选择服务类型
+
+选择日期时间
+
+填写地址
+
+填写钢琴信息
+
+选择服务商
+
+支付订金或全款
+
+查看预约状态
+
+服务商功能
+
+设置可预约时间
+
+设置服务区域
+
+设置价格
+
+接单 / 拒单
+
+查看即将到来的预约
+
+标记服务完成
+
+查看收入记录
+
+预约状态建议
+
+Pending
+
+Confirmed
+
+In Progress
+
+Completed
+
+Cancelled
+
+Refunded
+
+4. 评价与信誉系统
+
+这是平台能不能显得“真实”的关键。
+
+功能
+
+用户完成服务后评分
+
+对卖家和服务商写评论
+
+展示平均评分
+
+展示服务次数
+
+举报虚假评论
+
+管理员审核异常内容
+
+这个模块会让你的项目看起来更像真实产品，而不是课程作业。
+
+5. 后台管理系统 Admin Dashboard
+
+这是面试官很爱看的部分，因为它体现你理解完整业务。
+
+管理员功能
+
+查看所有用户
+
+管理商品发布
+
+审核服务商资料
+
+处理举报
+
+查看订单与预约
+
+查看平台收入
+
+数据统计图表
+
+冻结账号 / 下架内容
+
+四、完整业务流程
+
+下面我按真实产品流程给你讲。
+
+流程 1：普通用户预约调音
+步骤
+
+用户注册登录
+
+进入调音服务页
+
+输入地址和 suburb
+
+平台筛选附近可服务的调音师
+
+用户查看价格、评分、可预约时间
+
+选择时间并提交预约
+
+支付订金
+
+调音师收到通知
+
+调音师确认订单
+
+用户在预约当天完成服务
+
+平台更新订单状态为 completed
+
+用户留下评分和评论
+
+技术上涉及
+
+登录认证
+
+地址和区域匹配
+
+日历预约
 
 支付
 
-查看订单状态
+状态机流转
 
-下载电子票 / 二维码
+通知系统
 
-申请退款
+评论系统
 
-你要做：
+流程 2：卖家发布二手钢琴
+步骤
 
-订单状态机
-pending -> paid -> refunded / cancelled
+卖家注册为 seller
 
-支付集成
+填写钢琴品牌、型号、状态等
 
-Webhook 处理
+上传图片
 
-幂等校验
+提交审核或直接发布
 
-退款流程
+用户浏览商品
 
-支付失败重试提示
+用户联系卖家或下单
 
-如果你用 Stripe，会很贴近真实互联网产品。Stripe 官方长期强调支付、订阅、平台结算、开发者效率这些场景。
+平台记录成交
 
-这个部分面试官会很容易追问你：
+用户可追加搬运服务
 
-webhook 如何防重放
+技术上涉及
 
-支付成功但数据库更新失败怎么办
+文件上传
 
-如何保证订单和名额一致
+表单校验
 
-如何处理退款后的库存回补
+商品 CRUD
 
-这些都是非常好的后端面试点。
+搜索和筛选
 
-4. QR 签到与现场管理
+订单系统
 
-这是让项目从“管理系统”升级成“完整业务闭环”的关键。
+商家后台
 
-Staff/Organizer 可以：
+流程 3：服务商入驻平台
+步骤
 
-扫二维码签到
+服务商申请入驻
 
-查看签到列表
+提交个人资料、证书、服务区域、报价
 
-标记 no-show
+管理员审核
 
-手动补签到
+审核通过后可接单
 
-处理现场购票 / walk-in
+服务商设置可预约时间
 
-导出签到记录
+用户下单后服务商确认
 
-你要实现：
+服务完成后进入收入统计
 
-每张票唯一二维码
+技术上涉及
 
-二维码过期或二次使用校验
+多角色权限
 
-签到时间记录
+审核流程
 
-签到人记录
+后台管理
 
-现场统计面板
+可用时间管理
 
-这个功能非常适合演示，因为你可以现场展示：
-“用户买票 -> 生成二维码 -> 工作人员扫码 -> 状态变成已签到”。
+收入记录
 
-5. 通知系统
+五、你怎么做这个项目：开发流程
 
-项目像不像真实产品，通知系统很重要。
+我建议你不要一口气做完，而是按MVP → 增强版 → 商业化版三阶段推进。
 
-要有：
+阶段 1：MVP 最小可用版本
+
+先做最核心的东西，让项目能跑起来。
+
+目标
+
+做出一个可演示的网站，支持：
+
+注册登录
+
+浏览钢琴商品
+
+发布商品
+
+浏览服务
+
+提交预约
+
+后台查看订单
+
+技术重点
+
+Auth
+
+Database schema
+
+API routes
+
+Basic UI
+
+CRUD
+
+这个阶段做完，你已经可以写进简历了
+阶段 2：增强版
+
+把项目从“作业”变成“作品”。
+
+增加
+
+Stripe 支付
 
 邮件通知
 
-站内通知
+评分评论
 
-报名成功通知
+搜索和筛选
 
-支付成功通知
+图片上传
 
-活动变更通知
+服务商可用时间
 
-活动临近提醒
+Admin Dashboard
 
-退款状态通知
+数据统计
 
-进阶一点可以做：
+这个阶段做完，竞争力会明显提升
+阶段 3：商业化版
 
-通知偏好设置
+把它往真实创业产品方向推。
 
-批量邮件发送
+增加
 
-重试队列
+平台抽成
 
-通知日志
+多城市支持
 
-这能让你展示异步任务能力。比如：
+Google Maps
 
-支付成功后发邮件不在主请求里同步做
+区域服务范围
 
-放进 job queue 处理
+聊天/站内消息
 
-6. 管理后台与数据分析
+服务商订阅会员
 
-这是前端和后端都很好发挥的部分。
+优先曝光
 
-Organizer Dashboard：
+SEO 优化
 
-活动报名人数
+六、技术栈推荐
 
-收入统计
+你想以后偏后端和全栈，我建议这套：
 
-出席率
-
-退款率
-
-热门活动
-
-报名趋势图
-
-Admin Dashboard：
-
-平台总用户数
-
-总活动数
-
-总 GMV
-
-活跃社团
-
-异常订单
-
-近期错误日志摘要
-
-你要做的不是简单数字展示，而是：
-
-支持时间筛选
-
-支持导出 CSV
-
-支持按活动维度分析
-
-支持分页、搜索、排序
-
-这会让项目很像真实后台系统。
-
-7. 审计日志与安全
-
-这是很多学生项目没有，但企业项目很看重的点。
-
-要记录：
-
-谁创建了活动
-
-谁修改了价格
-
-谁审批了退款
-
-谁更改了用户角色
-
-谁删除了活动
-
-Auth0 也有日志和审计相关文档，说明这类操作记录在真实系统中是很重要的。
-
-你可以做一个 audit_logs 表，记录：
-
-actor_id
-
-action
-
-entity_type
-
-entity_id
-
-before_snapshot
-
-after_snapshot
-
-timestamp
-
-ip / user_agent
-
-这个点面试里非常加分，因为能体现你不只会“做功能”，还懂系统治理。
-
-推荐技术栈
 前端
 
 Next.js
@@ -347,292 +470,472 @@ Tailwind CSS
 
 shadcn/ui
 
-React Query
-
-Zod
-
-Chart 库做 dashboard
-
 后端
 
-两种路线都可以：
+Next.js Route Handlers 或 NestJS
 
-路线 A：Next.js 全栈
+我更建议你先用 Next.js 全栈
 
-Next.js App Router
+后期再拆服务也行
 
-Server Actions / Route Handlers
-
-Prisma
+数据库
 
 PostgreSQL
 
-Redis
+Prisma ORM
+
+认证
+
+Auth.js 或 Clerk
+
+我更建议你用 Auth.js，面试更能讲原理
+
+文件上传
+
+UploadThing 或 AWS S3
+
+支付
 
 Stripe
 
-Resend / Nodemailer
+地图
 
-Sentry
+Google Maps API
 
-路线 B：前后端分离
+通知
 
-Frontend: Next.js
+Resend 发邮件
 
-Backend: NestJS
+或 Twilio 发短信
 
-Prisma / TypeORM
+部署
 
-PostgreSQL
+Vercel（前端和 API）
 
-Redis
+Supabase / Neon（数据库）
 
-BullMQ
+七、数据库表设计思路
 
-Stripe
+你很重视数据库，这个项目也正好能体现你这方面的优势。
 
-Sentry
-
-如果你想更突出“后端工程能力”，我更建议你做 Next.js + NestJS 的分离式架构。这样你可以更自然地展示：
-
-REST API
-
-Swagger
-
-DTO 校验
-
-模块化服务设计
-
-background jobs
-
-RBAC guard
-
-webhook handling
-
-数据库实体建议
-
-核心表至少有这些：
+核心表建议如下：
 
 users
 
-organizations
+id
 
-memberships
+name
 
-events
+email
 
-ticket_types
+password_hash
+
+role
+
+phone
+
+avatar_url
+
+created_at
+
+provider_profiles
+
+id
+
+user_id
+
+provider_type
+
+bio
+
+suburb
+
+travel_radius_km
+
+hourly_rate
+
+verified
+
+piano_listings
+
+id
+
+seller_id
+
+brand
+
+model
+
+piano_type
+
+year
+
+condition
+
+price
+
+suburb
+
+description
+
+status
+
+listing_images
+
+id
+
+listing_id
+
+image_url
+
+sort_order
+
+services
+
+id
+
+provider_id
+
+service_type
+
+title
+
+price
+
+duration_minutes
+
+active
+
+availability_slots
+
+id
+
+provider_id
+
+start_time
+
+end_time
+
+is_booked
+
+bookings
+
+id
+
+customer_id
+
+provider_id
+
+service_id
+
+booking_date
+
+status
+
+address
+
+notes
+
+total_price
 
 orders
 
-order_items
+id
+
+buyer_id
+
+listing_id
+
+status
+
+total_price
+
+payment_status
+
+reviews
+
+id
+
+reviewer_id
+
+target_user_id
+
+booking_id
+
+rating
+
+comment
 
 payments
 
-refunds
+id
 
-check_ins
+booking_id / order_id
 
-notifications
+amount
 
-audit_logs
+currency
 
-files/uploads
+status
 
-关系大概是：
+stripe_payment_intent_id
 
-一个 organization 有多个 events
+admin_reports
 
-一个 event 有多个 ticket_types
+id
 
-一个 user 有多个 orders
+reporter_id
 
-一个 order 对应多个 order_items
+target_type
 
-一个 order 关联一个 payment
+target_id
 
-一个 ticket/order_item 可以对应一个 check_in
+reason
 
-这个项目很适合你顺便展示数据库设计能力，比如：
+status
 
-唯一约束
+八、你如何收益
 
-外键
+这个部分我分成项目收益和商业收益两层讲。
 
-事务
+第一层：你作为求职者的收益
 
-索引
+这是你最现实、最先能拿到的收益。
 
-乐观/悲观锁思路
+1. 简历价值很高
 
-你至少要做到的 MVP
+你可以在简历里写：
 
-如果你想先做一个能上线、能写进简历的版本，先做这 8 个：
+Built a full-stack marketplace and booking platform for piano services
 
-用户注册登录
+Implemented role-based access control, scheduling, payments, reviews, and admin dashboard
 
-角色权限系统
+Designed relational database schema using PostgreSQL and Prisma
 
-创建活动
+Deployed scalable production-ready application using Vercel and cloud services
 
-报名下单
+这类描述比“做了个博客”强很多。
 
-Stripe 支付
+2. 面试时特别好讲
 
-二维码电子票
+这个项目很适合回答下面这些常见问题：
 
-Organizer 后台看报名数据
+你做过什么复杂项目？
 
-GitHub Actions 自动测试部署
+你是怎么设计数据库的？
 
-GitHub 官方文档明确说明，Actions 可以自动 build、test，并在 PR 上显示结果；这能很好证明你的工程习惯。
+如何处理权限控制？
 
-真正有竞争力的进阶功能
+订单状态怎么管理？
 
-如果你想让这个项目从“不错”变成“很强”，建议再加这些：
+如何防止重复预约？
 
-A. 候补名单系统
+如何设计支付流程？
 
-活动满员后进入 waitlist
+你如何处理文件上传和搜索筛选？
 
-有人退款后自动递补
+也就是说，它非常适合拿来做项目深挖题。
 
-自动发通知
+3. 展示你不只是写页面
 
-B. 社团成员协作
+很多毕业生项目只会做：
 
-一个活动可邀请多个 organizer/staff
+登录
 
-不同成员有不同后台权限
+展示列表
 
-C. 优惠码系统
+点进详情页
 
-折扣码
-
-使用次数限制
-
-按票种限制
-
-过期时间
-
-D. 文件上传
-
-活动封面
-
-组织 Logo
-
-导出报表
-
-票据附件
-
-E. 搜索与筛选
-
-按时间、地点、价格、标签筛选活动
-
-支持全文搜索
-
-F. 任务队列
-
-发邮件
-
-生成报表
-
-自动取消超时未支付订单
-
-G. 可观测性
-
-Sentry 错误监控
-
-release tracking
-
-性能 tracing
-
-Sentry 官方文档说明，它支持错误和性能问题追踪，还能看 release health。这个点很适合你在 README 里写“生产级监控”。
-
-面试官最想听到的亮点
-
-你做完后，简历里不要只写“做了一个活动平台”，而要写成这种表达：
-
-Built a production-style event management SaaS platform for student organizations, featuring RBAC, Stripe payments, QR-based ticket check-in, analytics dashboards, audit logging, and CI/CD deployment.
-
-你项目的卖点会是：
-
-不只是 CRUD
-
-有真实业务流
-
-有支付
-
-有权限
-
-有后台
-
-有监控
-
-有自动化测试和部署
-
-这类项目比“博客系统”“电商克隆”“任务管理器”更容易让人觉得你已经有一点真实工程经验。
-
-我建议你的开发顺序
-
-第一阶段先把主线跑通：
-
-auth
-
-organizations
-
-events
-
-ticket types
-
-orders
-
-payment webhook
-
-dashboard
-
-第二阶段补产品完整度：
-
-QR check-in
-
-notifications
-
-refunds
-
-audit logs
-
-第三阶段补工程竞争力：
-
-tests
-
-CI/CD
-
-monitoring
-
-Docker
-
-seed/demo accounts
-
-我帮你定一个最终命题标题
-
-你可以直接用这个题目：
-
-CampusOps — Full-Stack Event & Ticketing Platform for University Organizations
-
-一句简介：
-
-A production-style SaaS platform for managing university events, registrations, payments, QR check-ins, analytics, and role-based operations.
-
-这个题目很适合你当前方向，因为它能同时体现：
-
-后端主导能力
-
-一部分前端展示能力
-
-数据库设计
-
-云部署思维
+但你这个项目能展示：
 
 真实业务建模
 
-如果你要，我下一条可以直接继续帮你做这个项目的 完整 PRD + 数据库表设计 + 技术架构图 + 开发里程碑。
+平台型产品思维
+
+多角色权限
+
+商业逻辑
+
+后台系统
+
+这会让你更像一个真正的软件工程候选人。
+
+第二层：你作为产品 owner 的收益
+
+如果以后你真的想试着变现，这项目也有空间。
+
+模式 1：服务预约抽成
+
+平台每一单抽 10%-15%
+
+例如：
+
+调音 $220
+
+平台抽成 $22
+
+如果一个月 100 单，就是：
+
+$2,200 / 月
+
+模式 2：卖家上架收费
+
+例如：
+
+普通免费
+
+置顶商品 $9.99
+
+首页推荐 $19.99
+
+模式 3：服务商会员
+
+例如：
+
+免费版：每月只能接 5 单
+
+Pro 版：$29 / 月，无限接单、优先展示
+
+模式 4：广告和推荐
+
+例如：
+
+钢琴搬运推荐
+
+钢琴老师推荐
+
+琴行广告位
+
+模式 5：线索费
+
+就算用户没在线支付，只要你把客户线索提供给服务商，也可以收 lead fee。
+
+九、这个项目怎么落地最现实
+
+我建议你现在不要想着“一上线就赚钱”，而是按下面思路：
+
+第一步
+
+把它当成高质量求职项目
+
+目标：
+
+做出能上线展示的版本
+
+写进简历
+
+放到 GitHub
+
+放到 portfolio
+
+第二步
+
+找真实用户验证
+比如：
+
+华人钢琴群
+
+Facebook Marketplace 卖家
+
+墨尔本调音师
+
+钢琴老师
+
+问他们：
+
+愿不愿意用一个统一预约平台
+
+最需要的功能是什么
+
+第三步
+
+只测试一个细分场景
+例如先只做：
+
+钢琴调音预约平台
+
+不要一开始全做买卖、维修、搬运、老师。
+
+你可以先从一个垂直点切进去，再扩展。
+
+十、你应该怎么开始
+
+我建议你的启动顺序是：
+
+第 1 周
+
+确定项目功能范围
+
+画页面结构图
+
+设计数据库 ERD
+
+建立 Next.js 项目
+
+做登录注册
+
+第 2 周
+
+做用户资料
+
+做钢琴列表和详情页
+
+做发布商品功能
+
+第 3 周
+
+做服务列表
+
+做预约提交
+
+做订单状态
+
+第 4 周
+
+做商家后台
+
+做管理员后台基础功能
+
+第 5 周
+
+接 Stripe
+
+接图片上传
+
+做评论系统
+
+第 6 周
+
+优化 UI
+
+部署上线
+
+写 README
+
+准备项目讲解稿
+
+十一、你最后能拿到什么
+
+如果你认真做完，最后你会有：
+
+一个完整全栈项目
+
+一个可上线访问的网站
+
+一个高质量 GitHub 仓库
+
+一套能在面试里反复使用的项目故事
+
+一份很强的简历项目经历
+
+甚至一个未来可变现的小产品雏形
+
+十二、我对你的建议
+
+对你来说，最好的收益路径不是“先拿这个赚钱”，而是：
+
+先用它帮你拿到更好的软件岗位机会。
+
+因为你现在真正最值钱的，不是钢琴行业本身，而是你把一个真实行业需求做成软件产品的能力。
+
+这个能力，比项目本身更值钱。
