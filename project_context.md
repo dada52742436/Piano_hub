@@ -10,7 +10,8 @@
 
 - **Backend**: NestJS 11 (strict TypeScript) + Prisma 7 + PostgreSQL + JWT
 - **Frontend**: React 19 + Vite 8 + TypeScript + React Router v7 + Axios
-- **功能**: 用户注册、登录、bcrypt 密码存储、JWT 认证、受保护页面
+- **背景**: 墨尔本二手钢琴平台（货币 AUD $）
+- **功能**: 用户注册、登录、bcrypt 密码存储、JWT 认证、Listing CRUD（含权限校验）
 
 ---
 
