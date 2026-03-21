@@ -1,33 +1,174 @@
-项目名称建议
+# PianoHub Melbourne
 
-PianoHub
-副标题可以是：
+> 墨尔本二手钢琴交易平台 MVP — A marketplace for buying and selling second-hand pianos in Melbourne, Australia.
 
-A marketplace and booking platform for piano services
+---
 
-你也可以中文理解成：
+## 项目简介
 
-一个面向钢琴买卖、调音、维修、搬运和老师预约的平台
+本项目是一个面向墨尔本地区的二手钢琴买卖平台。卖家可以发布钢琴 Listing，买家可以浏览和查看详情。平台采用 JWT 身份认证保护卖家操作，并在后端做所有权校验，防止用户篡改他人数据。
 
-一、这个项目到底是在做什么
+**技术栈：**
+- **Backend**: NestJS 11 (strict TypeScript) + Prisma 7 + PostgreSQL + JWT
+- **Frontend**: React 19 + Vite 8 + TypeScript + React Router v7 + Axios
 
-它本质上不是单一功能网站，而是一个垂直行业平台。
+---
 
-它解决的是钢琴行业里几个很真实的问题：
+## 已实现功能
 
-用户端痛点
+### 1. 用户认证系统
 
-想买二手钢琴，但信息分散在 Gumtree、Facebook、微信群
+| 功能 | 说明 |
+|------|------|
+| 用户注册 | 邮箱 + 用户名 + 密码，bcrypt（saltRounds=10）加密存储 |
+| 用户登录 | 邮箱 + 密码，验证成功返回 JWT Access Token |
+| JWT 认证 | Bearer Token，有效期 7 天，所有受保护接口统一校验 |
+| 全局 Auth 状态 | React Context + localStorage，刷新页面不丢失登录状态 |
+| 受保护路由 | 前端 `ProtectedRoute` 组件，未登录访问自动跳转 `/login` |
 
-想找调音师，不知道谁靠谱、价格多少
+### 2. Listing（钢琴发布）模块
 
-想预约搬运或维修，流程混乱
+#### 2a. 后端 API
 
-想找钢琴老师，也没有统一入口
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/listings` | 获取所有 listings（含卖家公开信息） | 无 |
+| GET | `/listings/mine` | 获取当前登录用户发布的所有 listings | JWT |
+| GET | `/listings/:id` | 获取单个 listing 详情 | 无 |
+| POST | `/listings` | 创建新 listing | JWT |
+| PATCH | `/listings/:id` | 编辑 listing（仅本人，否则返回 403） | JWT |
+| DELETE | `/listings/:id` | 删除 listing（仅本人，否则返回 403） | JWT |
 
-商家/服务者端痛点
+**字段说明：**
+- `title`（必填，3–100字符）
+- `description`（必填，10–2000字符）
+- `price`（必填，≥ 0，AUD）
+- `condition`（必填，枚举：`new` / `like_new` / `good` / `fair` / `poor`）
+- `brand`（选填）
+- `location`（选填，墨尔本区域）
 
-没有统一获客平台
+**所有权校验：** `ownerId` 始终从 JWT 注入（`req.user.id`），不接受客户端传入；编辑/删除操作若非本人触发 403。
+
+#### 2b. 前端页面
+
+| 路径 | 页面 | 说明 | 保护 |
+|------|------|------|------|
+| `/listings` | `ListingsPage` | 所有 listings 网格展示，AUD 价格，登录后显示发布/我的按钮 | 公开 |
+| `/listings/:id` | `ListingDetailPage` | 单个 listing 详情，本人显示 Edit / Delete 按钮 | 公开 |
+| `/listings/new` | `CreateListingPage` | 发布新 listing 表单 | 需登录 |
+| `/listings/mine` | `MyListingsPage` | 当前用户所有发布，支持直接删除 | 需登录 |
+| `/listings/:id/edit` | `EditListingPage` | 预填充编辑表单，非本人自动跳走 | 需登录 |
+
+### 3. 导航与路由
+
+- 默认路径 `/` 重定向至 `/listings`
+- 登录 / 注册成功后跳转 `/listings`
+- `DashboardPage` 提供「Browse Listings」快捷跳转
+- `ListingsPage` 提供「Dashboard」快捷跳转
+
+---
+
+## 数据库 Schema
+
+```prisma
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  username  String
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  listings  Listing[]
+  @@map("users")
+}
+
+model Listing {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  price       Float
+  brand       String?
+  condition   String
+  location    String?
+  ownerId     Int
+  owner       User     @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("listings")
+}
+```
+
+---
+
+## 环境要求
+
+- Node.js 22+
+- PostgreSQL（本地 5432，数据库名：`auth_demo`）
+
+**`backend/.env` 配置：**
+
+```env
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/auth_demo"
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+JWT_EXPIRES_IN="7d"
+```
+
+---
+
+## 启动方式
+
+```powershell
+# 终端 1 — 后端（http://localhost:3001）
+cd backend
+npm run start:dev
+
+# 终端 2 — 前端（http://localhost:3000）
+cd frontend
+npm run dev
+```
+
+> 前端通过 Vite proxy 将 `/api` 请求转发至 `localhost:3001`，无需手动处理跨域。
+
+---
+
+## 目录结构
+
+```
+my-project150326/
+├── backend/
+│   ├── prisma/
+│   │   └── schema.prisma          ← User + Listing 模型
+│   ├── prisma.config.ts           ← Prisma 7 配置（含 datasource.url）
+│   ├── src/
+│   │   ├── auth/                  ← 注册、登录、JWT 策略、Guard
+│   │   ├── users/                 ← UsersService
+│   │   ├── listings/              ← Listings CRUD 模块
+│   │   │   ├── dto/
+│   │   │   ├── listings.service.ts
+│   │   │   ├── listings.controller.ts
+│   │   │   └── listings.module.ts
+│   │   ├── prisma/                ← PrismaService（组合模式）
+│   │   └── main.ts                ← 端口 3001, CORS, ValidationPipe
+│   └── generated/prisma/          ← Prisma Client（由 prisma generate 生成）
+└── frontend/
+    ├── vite.config.ts             ← port:3000, proxy /api → :3001
+    └── src/
+        ├── api/
+        │   ├── auth.ts            ← axios 实例 + 拦截器 + auth 方法
+        │   └── listings.ts        ← listings CRUD 方法 + 类型
+        ├── context/AuthContext.tsx
+        ├── components/ProtectedRoute.tsx
+        └── pages/                 ← 所有页面组件
+```
+
+---
+
+## 待实现功能
+
+- [ ] 全局 Navbar 导航栏
+- [ ] 搜索 / 筛选（价格区间、品牌、成色）
+- [ ] 图片上传
+- [ ] 买家联系卖家（站内消息系统）
 
 预约流程全靠微信/电话
 
