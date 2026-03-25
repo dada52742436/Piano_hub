@@ -19,12 +19,12 @@ export function DashboardPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [error, setError] = useState('');
 
-  // 组件加载时请求受保护接口，验证 token 有效性
+  // Request the protected profile endpoint when the page loads.
   useEffect(() => {
     getProfile()
       .then(setProfile)
       .catch(() => {
-        setError('Token 已过期，请重新登录');
+        setError('Your session has expired. Please log in again.');
       });
   }, []);
 
@@ -37,11 +37,11 @@ export function DashboardPage() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.header}>
-          <h2 style={styles.title}>欢迎回来，{user?.username} 👋</h2>
+          <h2 style={styles.title}>Welcome back, {user?.username}</h2>
           <div style={{ display: 'flex', gap: 8 }}>
             <Link to="/listings" style={styles.logoutBtn}>Browse Listings</Link>
             <button style={styles.logoutBtn} onClick={handleLogout}>
-              退出登录
+              Log Out
             </button>
           </div>
         </div>
@@ -52,29 +52,29 @@ export function DashboardPage() {
 
         {profile ? (
           <div>
-            <p style={styles.badge}>✅ 受保护页面 — 后端验证 Token 成功</p>
+            <p style={styles.badge}>Protected page access confirmed. Backend token validation succeeded.</p>
             <div style={styles.infoBox}>
               <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>用户 ID</span>
+                <span style={styles.infoLabel}>User ID</span>
                 <span>{profile.user.id}</span>
               </div>
               <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>邮箱</span>
+                <span style={styles.infoLabel}>Email</span>
                 <span>{profile.user.email}</span>
               </div>
               <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>用户名</span>
+                <span style={styles.infoLabel}>Username</span>
                 <span>{profile.user.username}</span>
               </div>
               <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>注册时间</span>
-                <span>{new Date(profile.user.createdAt).toLocaleString('zh-CN')}</span>
+                <span style={styles.infoLabel}>Registered At</span>
+                <span>{new Date(profile.user.createdAt).toLocaleString('en-AU')}</span>
               </div>
             </div>
             <p style={styles.desc}>{profile.message}</p>
           </div>
         ) : !error ? (
-          <p style={{ color: '#888' }}>加载中...</p>
+          <p style={{ color: '#888' }}>Loading...</p>
         ) : null}
       </div>
     </div>

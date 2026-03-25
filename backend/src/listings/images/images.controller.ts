@@ -14,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'node:path';
 import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard.js';
 import { ImagesService } from './images.service.js';
 import type { User } from '../../../generated/prisma/client.js';
@@ -26,6 +27,8 @@ interface AuthenticatedRequest extends Request {
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+@ApiTags('listing-images')
+@ApiBearerAuth('access-token')
 @Controller('listings/:listingId/images')
 export class ImagesController {
   constructor(private readonly imagesService: ImagesService) {}
@@ -34,8 +37,11 @@ export class ImagesController {
   // Upload a single image for a listing (owner-only, JWT required).
   // Field name in the multipart form must be "file".
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(
+  @UseGuards(JwtAuthGuard)  @ApiOperation({ summary: 'Upload an image for a listing (max 5, owner only)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: 'Image uploaded — returns ListingImage record' })
+  @ApiResponse({ status: 400, description: 'Invalid file type, too large, or limit reached' })
+  @ApiResponse({ status: 403, description: 'Forbidden — not the owner' })  @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
@@ -73,8 +79,10 @@ export class ImagesController {
   // ── DELETE /listings/:listingId/images/:imageId ───────────────────────────
   // Delete a specific image from a listing (owner-only, JWT required).
   @Delete(':imageId')
-  @UseGuards(JwtAuthGuard)
-  removeImage(
+  @UseGuards(JwtAuthGuard)  @ApiOperation({ summary: 'Delete a listing image (owner only)' })
+  @ApiResponse({ status: 200, description: 'Image deleted' })
+  @ApiResponse({ status: 404, description: 'Image not found on this listing' })
+  @ApiResponse({ status: 403, description: 'Forbidden — not the owner' })  removeImage(
     @Param('listingId', ParseIntPipe) listingId: number,
     @Param('imageId', ParseIntPipe) imageId: number,
     @Req() req: AuthenticatedRequest,

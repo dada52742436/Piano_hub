@@ -7,11 +7,13 @@ import {
 } from '../api/listings';
 import { useAuth } from '../context/AuthContext';
 import { CONDITIONS, type ListingCondition } from '../constants/conditions';
+import { Field } from '../components/ui/Field';
+import { sharedInputStyle } from '../styles/shared';
 
 // CONDITIONS is imported from the shared constants file, which is the single
 // source of truth for valid condition values across the entire frontend.
 
-// Form state shape — all strings for controlled inputs, converts on submit
+// Form state shape �?all strings for controlled inputs, converts on submit
 interface FormState {
   title: string;
   description: string;
@@ -36,7 +38,7 @@ export function EditListingPage() {
     if (!id) return;
     getListingById(Number(id))
       .then((listing) => {
-        // Ownership guard on the client side — redirect if not the owner
+        // Ownership guard on the client side �?redirect if not the owner
         // The backend will also enforce this with a 403, but we fail fast here
         if (user && listing.ownerId !== user.id) {
           navigate(`/listings/${id}`);
@@ -68,7 +70,7 @@ export function EditListingPage() {
     setSubmitting(true);
 
     try {
-      // Build payload — only send fields that differ or are non-empty
+      // Build payload �?only send fields that differ or are non-empty
       const payload: UpdateListingPayload = {
         title: form.title,
         description: form.description,
@@ -97,7 +99,7 @@ export function EditListingPage() {
 
   return (
     <div style={styles.page}>
-      <Link to={`/listings/${id}`} style={styles.back}>← Back to Listing</Link>
+      <Link to={`/listings/${id}`} style={styles.back}>�?Back to Listing</Link>
       <h2 style={styles.heading}>Edit Listing</h2>
 
       <form onSubmit={handleSubmit} style={styles.form}>
@@ -105,7 +107,7 @@ export function EditListingPage() {
 
         <Field label="Title *">
           <input
-            style={styles.input}
+            style={sharedInputStyle}
             name="title"
             value={form.title}
             onChange={handleChange}
@@ -115,7 +117,7 @@ export function EditListingPage() {
 
         <Field label="Description *">
           <textarea
-            style={{ ...styles.input, height: 120, resize: 'vertical' }}
+            style={{ ...sharedInputStyle, height: 120, resize: 'vertical' }}
             name="description"
             value={form.description}
             onChange={handleChange}
@@ -125,7 +127,7 @@ export function EditListingPage() {
 
         <Field label="Price (AUD $) *">
           <input
-            style={styles.input}
+            style={sharedInputStyle}
             type="number"
             name="price"
             value={form.price}
@@ -137,7 +139,7 @@ export function EditListingPage() {
 
         <Field label="Condition *">
           <select
-            style={styles.input}
+            style={sharedInputStyle}
             name="condition"
             value={form.condition}
             onChange={handleChange}
@@ -153,7 +155,7 @@ export function EditListingPage() {
 
         <Field label="Brand (optional)">
           <input
-            style={styles.input}
+            style={sharedInputStyle}
             name="brand"
             value={form.brand}
             onChange={handleChange}
@@ -163,7 +165,7 @@ export function EditListingPage() {
 
         <Field label="Location (optional)">
           <input
-            style={styles.input}
+            style={sharedInputStyle}
             name="location"
             value={form.location}
             onChange={handleChange}
@@ -184,28 +186,12 @@ export function EditListingPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 500 }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-// ── Inline styles ─────────────────────────────────────────────────────────────
+// ── Inline styles ─────────────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 560, margin: '40px auto', padding: '0 20px' },
   back: { display: 'inline-block', marginBottom: 20, color: '#2563eb', textDecoration: 'none', fontSize: 14 },
   heading: { margin: '0 0 24px', fontSize: 22, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column' },
-  input: {
-    width: '100%', padding: '9px 12px', fontSize: 14,
-    border: '1px solid #d1d5db', borderRadius: 6,
-    boxSizing: 'border-box', outline: 'none',
-  },
   btnRow: { display: 'flex', gap: 12, marginTop: 8 },
   btnCancel: {
     flex: 1, padding: '10px 0', textAlign: 'center',
