@@ -3,15 +3,12 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "extensionsToTreatAsEsm": [".ts"],
   "transform": {
     "^.+\\.(t|j)s$": [
       "ts-jest",
       {
-        "tsconfig": {
-          "module": "commonjs",
-          "moduleResolution": "node",
-          "resolvePackageJsonExports": false
-        }
+        "useESM": true
       }
     ]
   },
