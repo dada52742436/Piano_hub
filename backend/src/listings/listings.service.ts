@@ -180,6 +180,7 @@ export class ListingsService {
         ...(dto.price !== undefined && { price: dto.price }),
         ...(dto.brand !== undefined && { brand: dto.brand }),
         ...(dto.condition !== undefined && { condition: dto.condition }),
+        ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.location !== undefined && { location: dto.location }),
       },
       include: {

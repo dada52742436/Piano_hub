@@ -1,6 +1,6 @@
 ﻿# Project Context — Piano Listing Platform (Melbourne)
 
-> 用于在新对话中恢复上下文。当前状态：**Phase 4 完成 — 单元测试（26 tests）、Swagger UI、Seed 演示数据、Docker 容器化、组件抽离、图片上传、搜索/筛选/分页全部就绪。**
+> 用于在新对话中恢复上下文。当前状态：**Phase 4 完成 — 单元测试（27 tests）、E2E baseline（36 tests）、Swagger UI、Seed 演示数据、Docker 容器化、组件抽离、图片上传、搜索/筛选/分页全部就绪。**
 
 ---
 
@@ -383,7 +383,7 @@ docker compose exec backend npx prisma db seed
 - 买家联系卖家（消息系统 / WebSocket）
 - Listing 状态字段（active / sold / archived）
 - 收藏 / 关注 listing
-- 真正的 E2E 测试（只有脚手架，无实际用例）
+- 后续新业务模块的增量 E2E 扩展
 - Tailwind CSS 迁移
 
 ---
@@ -408,9 +408,10 @@ docker compose exec backend npx prisma db seed
 - **当前状态**: ✅ 已移除，后端启动正常
 
 ### 4. E2E 测试状态
-- `backend/test/app.e2e-spec.ts` 中只有 NestJS 脚手架生成的一个占位测试 (`GET /` → `Hello World!`)
-- **E2E 测试从未实现**，`npm run test:e2e` 只会跑这一个无意义的测试
-- **已实现的**是单元测试（26 个测试，3 个 spec 文件）
+- `backend/test/app.e2e-spec.ts` 已从 NestJS 默认脚手架测试扩展为当前阶段的综合 E2E 基线
+- `npm run test:e2e` 当前可稳定运行，覆盖 **36 个测试**
+- 已覆盖模块：`auth`、`protected profile`、`listings public + owner flows`、`bookings lifecycle + ownership`、`listing images`
+- 单元测试当前为 **27 个测试，4 个 spec 文件**
 
 ---
 
@@ -423,6 +424,8 @@ docker compose exec backend npx prisma db seed
 - **`src/auth/auth.service.spec.ts`**（新文件）：6 个单元测试（注册/登录全流程）
 - **`src/listings/listings.service.spec.ts`**（新文件）：10 个单元测试（CRUD + 403 + 分页）
 - **`src/listings/images/images.service.spec.ts`**（新文件）：10 个单元测试（图片上传/删除）
+- **`src/app.controller.spec.ts`**：1 个基础单元测试
+- **`test/app.e2e-spec.ts`**：36 个 E2E 测试，覆盖 auth、protected、listings、bookings、listing images
 - **Jest 配置**（`package.json`）：`ts-jest` 覆盖 `module: "commonjs"` + `moduleNameMapper` `.js` → `.ts`，解决 ESM/CJS 冲突
 
 ### 前端

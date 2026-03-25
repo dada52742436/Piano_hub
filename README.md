@@ -134,8 +134,8 @@ Click **Authorize** and paste a Bearer token (obtained from `POST /auth/login`) 
 
 ```bash
 cd backend
-npm test            # unit tests (26 tests, 3 suites)
-npm run test:e2e    # end-to-end tests (scaffold only, not yet implemented)
+npx jest --runInBand # unit tests (27 tests, 4 suites)
+npm run test:e2e     # end-to-end baseline (36 tests)
 ```
 
 ---

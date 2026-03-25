@@ -18,6 +18,7 @@ const mockListing = {
   price: 5500,
   brand: 'Yamaha',
   condition: 'good',
+  status: 'active',
   location: 'Melbourne CBD',
   ownerId: 1,
   createdAt: new Date('2026-01-01'),
@@ -124,7 +125,12 @@ describe('ListingsService', () => {
       mockPrismaService.prisma.listing.create.mockResolvedValue(mockListing);
 
       const result = await service.create(
-        { title: 'Test Piano', description: 'Desc', price: 5000, condition: 'good' },
+        {
+          title: 'Test Piano',
+          description: 'A detailed upright piano description',
+          price: 5000,
+          condition: 'good',
+        },
         1,
       );
 
@@ -160,6 +166,21 @@ describe('ListingsService', () => {
       expect(result.title).toBe('New Title');
       expect(mockPrismaService.prisma.listing.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 1 } }),
+      );
+    });
+
+    it('updates the listing status when the requester is the owner', async () => {
+      mockPrismaService.prisma.listing.findUnique.mockResolvedValue(mockListing);
+      const updated = { ...mockListing, status: 'sold' };
+      mockPrismaService.prisma.listing.update.mockResolvedValue(updated);
+
+      const result = await service.update(1, { status: 'sold' }, 1);
+
+      expect(result.status).toBe('sold');
+      expect(mockPrismaService.prisma.listing.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'sold' }),
+        }),
       );
     });
   });

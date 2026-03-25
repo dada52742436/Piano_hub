@@ -33,6 +33,16 @@ enum BookingStatus {
   cancelled  // buyer withdrew the request
 }
 
+// Status of a marketplace listing.
+// active   = visible and available for enquiries/bookings
+// sold     = completed transaction, no longer available
+// archived = hidden by the owner without deleting the record
+enum ListingStatus {
+  active
+  sold
+  archived
+}
+
 // ── User ──────────────────────────────────────────────────────────────────────
 model User {
   id        Int       @id @default(autoincrement())
@@ -60,6 +70,7 @@ model Listing {
   price       Float
   brand       String?  // optional: piano brand (e.g. "Yamaha", "Kawai")
   condition   Condition // enforced at DB level via the Condition enum
+  status      ListingStatus @default(active)
   location    String?  // optional: city or region
 
   // Foreign key — the user who created this listing

@@ -8,6 +8,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { Condition } from '../condition.enum.js';
+import { ListingStatus } from '../listing-status.enum.js';
 
 // All fields are optional for PATCH — caller only sends what they want to change.
 // This is the standard partial-update pattern; we avoid PartialType from @nestjs/mapped-types
@@ -45,4 +46,10 @@ export class UpdateListingDto {
   @IsString()
   @MaxLength(100)
   location?: string;
+
+  @IsOptional()
+  @IsEnum(ListingStatus, {
+    message: `status must be one of: ${Object.values(ListingStatus).join(', ')}`,
+  })
+  status?: ListingStatus;
 }
