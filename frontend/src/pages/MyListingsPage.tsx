@@ -41,6 +41,27 @@ export function MyListingsPage() {
         </Link>
       </div>
 
+      {!loading && !error && listings.length > 0 && (
+        <div style={styles.summaryRow}>
+          <div style={styles.summaryCard}>
+            <span style={styles.summaryValue}>{listings.length}</span>
+            <span style={styles.summaryLabel}>Total</span>
+          </div>
+          <div style={styles.summaryCard}>
+            <span style={styles.summaryValue}>{listings.filter((listing) => listing.status === 'active').length}</span>
+            <span style={styles.summaryLabel}>Active</span>
+          </div>
+          <div style={styles.summaryCard}>
+            <span style={styles.summaryValue}>{listings.filter((listing) => listing.status === 'sold').length}</span>
+            <span style={styles.summaryLabel}>Sold</span>
+          </div>
+          <div style={styles.summaryCard}>
+            <span style={styles.summaryValue}>{listings.filter((listing) => listing.status === 'archived').length}</span>
+            <span style={styles.summaryLabel}>Archived</span>
+          </div>
+        </div>
+      )}
+
       {loading && <p style={styles.info}>Loading...</p>}
       {error && <p style={styles.error}>{error}</p>}
 
@@ -125,6 +146,18 @@ const styles: Record<string, React.CSSProperties> = {
   info: { textAlign: 'center', color: '#6b7280', marginTop: 40 },
   error: { color: '#dc2626', marginTop: 12 },
   emptyBox: { textAlign: 'center', marginTop: 60 },
+  summaryRow: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 18 },
+  summaryCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    padding: '14px 16px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#f9fafb',
+  },
+  summaryValue: { fontSize: 22, fontWeight: 700, color: '#111827' },
+  summaryLabel: { fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   row: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',

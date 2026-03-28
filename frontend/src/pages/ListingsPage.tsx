@@ -7,6 +7,7 @@ import {
 } from '../api/listings';
 import { useAuth } from '../context/AuthContext';
 import { CONDITION_LABELS, CONDITIONS } from '../constants/conditions';
+import { LISTING_STATUS_LABELS } from '../constants/listingStatus';
 
 // Shape of the filter form — separate from page so that page can reset independently
 interface Filters {
@@ -117,6 +118,10 @@ export function ListingsPage() {
         </div>
       </div>
 
+      <p style={styles.marketplaceNote}>
+        Public marketplace results only show active listings that are currently available.
+      </p>
+
       {/* ── Filter bar ─────────────────────────────────────────────── */}
       <div style={styles.filterBar}>
         {/* Full-text search across title + description */}
@@ -205,7 +210,7 @@ export function ListingsPage() {
       {error && <p style={styles.error}>{error}</p>}
 
       {!loading && !error && listings.length === 0 && !hasActiveFilters && (
-        <p style={styles.info}>No listings yet. Be the first to post one!</p>
+        <p style={styles.info}>No active listings yet. Be the first to post one!</p>
       )}
 
       {/* ── Listing grid ────────────────────────────────────────────── */}
@@ -215,6 +220,9 @@ export function ListingsPage() {
             <div style={styles.cardHeader}>
               <span style={styles.condition}>
                 {CONDITION_LABELS[listing.condition] ?? listing.condition}
+              </span>
+              <span style={{ ...styles.status, ...styles.statusActive }}>
+                {LISTING_STATUS_LABELS[listing.status]}
               </span>
               {listing.brand && <span style={styles.brand}>{listing.brand}</span>}
             </div>
@@ -263,6 +271,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 20,
   },
   title: { margin: 0, fontSize: 24 },
+  marketplaceNote: { margin: '0 0 16px', color: '#6b7280', fontSize: 14, lineHeight: 1.6 },
   actions: { display: 'flex', gap: 12 },
   btnPrimary: {
     padding: '8px 16px',
@@ -381,6 +390,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#eff6ff',
     color: '#1d4ed8',
     border: '1px solid #bfdbfe',
+  },
+  status: {
+    fontSize: 12,
+    padding: '2px 8px',
+    borderRadius: 4,
+    border: '1px solid transparent',
+  },
+  statusActive: {
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    borderColor: '#bfdbfe',
   },
   cardTitle: { margin: '0 0 8px', fontSize: 16, fontWeight: 600 },
   price: { margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#2563eb' },

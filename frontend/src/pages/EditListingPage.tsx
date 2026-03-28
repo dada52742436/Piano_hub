@@ -109,6 +109,19 @@ export function EditListingPage() {
       <form onSubmit={handleSubmit} style={styles.form}>
         {submitError && <p style={styles.error}>{submitError}</p>}
 
+        <div style={styles.statusGuide}>
+          <strong style={styles.statusGuideTitle}>Status guide</strong>
+          <p style={styles.statusGuideText}>
+            Active listings appear in the public marketplace and can receive new booking requests.
+          </p>
+          <p style={styles.statusGuideText}>
+            Sold listings stay visible to you for record-keeping, but buyers can no longer book them.
+          </p>
+          <p style={styles.statusGuideText}>
+            Archived listings are hidden from the public marketplace and are useful when you want to pause a listing without deleting it.
+          </p>
+        </div>
+
         <Field label="Title *">
           <input
             style={sharedInputStyle}
@@ -212,6 +225,15 @@ const styles: Record<string, React.CSSProperties> = {
   back: { display: 'inline-block', marginBottom: 20, color: '#2563eb', textDecoration: 'none', fontSize: 14 },
   heading: { margin: '0 0 24px', fontSize: 22, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column' },
+  statusGuide: {
+    marginBottom: 18,
+    padding: '14px 16px',
+    border: '1px solid #dbeafe',
+    borderRadius: 8,
+    background: '#f8fbff',
+  },
+  statusGuideTitle: { display: 'block', marginBottom: 8, color: '#1d4ed8', fontSize: 14 },
+  statusGuideText: { margin: '6px 0 0', color: '#4b5563', fontSize: 13, lineHeight: 1.6 },
   btnRow: { display: 'flex', gap: 12, marginTop: 8 },
   btnCancel: {
     flex: 1, padding: '10px 0', textAlign: 'center',

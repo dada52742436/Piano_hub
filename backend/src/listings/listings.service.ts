@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { Listing } from '../../generated/prisma/client.js';
+import type { Listing, Prisma } from '../../generated/prisma/client.js';
 import type { CreateListingDto } from './dto/create-listing.dto.js';
 import type { UpdateListingDto } from './dto/update-listing.dto.js';
 import type { GetListingsQueryDto } from './dto/get-listings-query.dto.js';
@@ -46,15 +46,7 @@ export class ListingsService {
 
     // Build the where clause dynamically — only include a filter when the
     // corresponding query param was actually provided.
-    const where: {
-      OR?: {
-        title?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }[];
-      condition?: Condition;
-      brand?: { contains: string; mode: 'insensitive' };
-      price?: { gte?: number; lte?: number };
-    } = {};
+    const where: Prisma.ListingWhereInput = {};
 
     // Public browse only shows listings that are currently available.
     where.status = ListingStatus.active;

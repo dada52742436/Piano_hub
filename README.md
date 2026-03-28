@@ -19,12 +19,14 @@ PianoHub connects piano buyers and sellers across Melbourne. Whether you're look
 - Search by keyword across title, brand, and description
 - Filter by condition (Excellent / Good / Fair / Poor)
 - Filter by price range and sort by price or date
+- Public marketplace shows active listings only
 
 ### Sell Your Piano
 - Create a free account and post a listing in minutes
 - Describe brand, type (upright / grand / digital / keyboard), condition, price, and suburb
 - Upload up to 5 photos per listing (JPEG / PNG / WebP, max 5 MB each)
 - Edit or remove your listing at any time from **My Listings**
+- Manage listing status with `active`, `sold`, and `archived`
 
 ### Book a Viewing
 - Submit a booking request with a preferred date and message to the seller
@@ -95,12 +97,17 @@ cd backend
 npx prisma db seed
 ```
 
-This creates two demo accounts and 7 sample piano listings:
+This creates two demo accounts and syncs 7 sample piano listings:
 
 | Email | Password | Role |
 |-------|----------|------|
 | alice@demo.com | demo123! | Seller (4 listings) |
 | bob@demo.com | demo123! | Seller (3 listings) |
+
+The seed is idempotent:
+- demo users are upserted by email
+- demo listings are synced by owner + title
+- you can re-run seed even if your database already contains manual listings
 
 ### 5. Start the backend
 
@@ -134,8 +141,8 @@ Click **Authorize** and paste a Bearer token (obtained from `POST /auth/login`) 
 
 ```bash
 cd backend
-npx jest --runInBand # unit tests (27 tests, 4 suites)
-npm run test:e2e     # end-to-end baseline (36 tests)
+npx jest --runInBand # unit tests (31 tests, 5 suites)
+npm run test:e2e     # end-to-end baseline (38 tests)
 ```
 
 ---

@@ -217,6 +217,24 @@ export function ListingDetailPage() {
 
         {/* Description */}
         <section style={styles.section}>
+          {isOwner && (
+            <div
+              style={{
+                ...styles.ownerStatusNotice,
+                ...(listing.status === 'active'
+                  ? styles.ownerStatusNoticeActive
+                  : listing.status === 'sold'
+                    ? styles.ownerStatusNoticeSold
+                    : styles.ownerStatusNoticeArchived),
+              }}
+            >
+              {listing.status === 'active'
+                ? 'This listing is live in the public marketplace and can receive new booking requests.'
+                : listing.status === 'sold'
+                  ? 'This listing is marked as sold. Buyers can no longer submit new booking requests.'
+                  : 'This listing is archived. It is hidden from the public marketplace and cannot receive new booking requests.'}
+            </div>
+          )}
           <h4 style={styles.sectionLabel}>Description</h4>
           <p style={styles.description}>{listing.description}</p>
         </section>
@@ -342,6 +360,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   divider: { margin: '20px 0', borderColor: '#e5e7eb' },
   section: { marginBottom: 20 },
+  ownerStatusNotice: {
+    marginBottom: 14,
+    padding: '12px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    lineHeight: 1.6,
+    border: '1px solid transparent',
+  },
+  ownerStatusNoticeActive: { background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' },
+  ownerStatusNoticeSold: { background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' },
+  ownerStatusNoticeArchived: { background: '#f3f4f6', color: '#4b5563', borderColor: '#d1d5db' },
   sectionLabel: { margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 },
   description: { margin: 0, lineHeight: 1.7, color: '#374151' },
   metaGrid: { display: 'flex', flexDirection: 'column' },
