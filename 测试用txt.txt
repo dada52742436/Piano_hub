@@ -1,5 +1,0 @@
-Invoke-RestMethod -Uri "http://localhost:3001/auth/register" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"email":"961554550@qq.com","username":"Wil","pa-----------
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjQsImVtYWlsIjoidGVzdDNAdGVzdC5jb20iLCJpYXQiOjE3NzM3NjEzMTYsImV4cCI6MTc3NDM2NjExNn0.-u7g7akqaAZT4P7yoM2B789qGuV_iILiE9CLWHWrWQw
