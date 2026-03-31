@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   getAllListings,
   type GetListingsParams,
@@ -28,6 +28,7 @@ const EMPTY_FILTERS: Filters = {
 
 export function ListingsPage() {
   const { user } = useAuth();
+  const [, setSearchParams] = useSearchParams();
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
@@ -63,6 +64,19 @@ export function ListingsPage() {
       cancelled = true;
     };
   }, [filters, page]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (filters.search) params.set('search', filters.search);
+    if (filters.condition) params.set('condition', filters.condition);
+    if (filters.brand) params.set('brand', filters.brand);
+    if (filters.minPrice) params.set('minPrice', filters.minPrice);
+    if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
+    if (page > 1) params.set('page', String(page));
+
+    setSearchParams(params, { replace: true });
+  }, [filters, page, setSearchParams]);
 
   useEffect(() => {
     if (!user) {
