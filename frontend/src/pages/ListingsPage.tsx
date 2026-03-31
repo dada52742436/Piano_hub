@@ -26,12 +26,44 @@ const EMPTY_FILTERS: Filters = {
   maxPrice: '',
 };
 
+function normalizeFilterValue(value: string) {
+  return value.trim();
+}
+
+function normalizeNumericFilter(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return '';
+  return String(parsed);
+}
+
+function normalizeFilters(input: Filters): Filters {
+  return {
+    search: normalizeFilterValue(input.search),
+    condition: input.condition,
+    brand: normalizeFilterValue(input.brand),
+    minPrice: normalizeNumericFilter(input.minPrice),
+    maxPrice: normalizeNumericFilter(input.maxPrice),
+  };
+}
+
 export function ListingsPage() {
   const { user } = useAuth();
-  const [, setSearchParams] = useSearchParams();
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialFilters: Filters = {
+    search: searchParams.get('search') ?? '',
+    condition: searchParams.get('condition') ?? '',
+    brand: searchParams.get('brand') ?? '',
+    minPrice: searchParams.get('minPrice') ?? '',
+    maxPrice: searchParams.get('maxPrice') ?? '',
+  };
+  const initialPage = Number(searchParams.get('page') ?? '1');
+
+  const [draft, setDraft] = useState<Filters>(initialFilters);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [page, setPage] = useState(Number.isFinite(initialPage) && initialPage > 0 ? initialPage : 1);
   const [result, setResult] = useState<PaginatedListings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,6 +98,29 @@ export function ListingsPage() {
   }, [filters, page]);
 
   useEffect(() => {
+    if (!result) return;
+    if (result.totalPages > 0 && page > result.totalPages) {
+      setPage(result.totalPages);
+    }
+  }, [page, result]);
+
+  useEffect(() => {
+    const nextFilters: Filters = {
+      search: searchParams.get('search') ?? '',
+      condition: searchParams.get('condition') ?? '',
+      brand: searchParams.get('brand') ?? '',
+      minPrice: searchParams.get('minPrice') ?? '',
+      maxPrice: searchParams.get('maxPrice') ?? '',
+    };
+    const nextPage = Number(searchParams.get('page') ?? '1');
+    const safeNextPage = Number.isFinite(nextPage) && nextPage > 0 ? nextPage : 1;
+
+    setDraft(nextFilters);
+    setFilters(nextFilters);
+    setPage(safeNextPage);
+  }, [searchParams]);
+
+  useEffect(() => {
     const params = new URLSearchParams();
 
     if (filters.search) params.set('search', filters.search);
@@ -92,7 +147,9 @@ export function ListingsPage() {
   }, [user]);
 
   function applyFilters() {
-    setFilters({ ...draft });
+    const nextFilters = normalizeFilters(draft);
+    setDraft(nextFilters);
+    setFilters(nextFilters);
     setPage(1);
   }
 
@@ -132,6 +189,13 @@ export function ListingsPage() {
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
   const listings = result?.data ?? [];
+  const activeFilterChips = [
+    filters.search ? `Search: ${filters.search}` : null,
+    filters.condition ? `Condition: ${CONDITION_LABELS[filters.condition] ?? filters.condition}` : null,
+    filters.brand ? `Brand: ${filters.brand}` : null,
+    filters.minPrice ? `Min: $${Number(filters.minPrice).toLocaleString()}` : null,
+    filters.maxPrice ? `Max: $${Number(filters.maxPrice).toLocaleString()}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div style={styles.page}>
@@ -208,6 +272,16 @@ export function ListingsPage() {
           </button>
         )}
       </div>
+
+      {activeFilterChips.length > 0 && (
+        <div style={styles.activeFilters}>
+          {activeFilterChips.map((chip) => (
+            <span key={chip} style={styles.filterChip}>
+              {chip}
+            </span>
+          ))}
+        </div>
+      )}
 
       {result && !loading && (
         <p style={styles.resultsInfo}>
@@ -329,6 +403,20 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: 8,
     marginBottom: 16,
+  },
+  activeFilters: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    padding: '5px 10px',
+    borderRadius: 999,
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    fontSize: 12,
   },
   filterInput: {
     padding: '7px 10px',

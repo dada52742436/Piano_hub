@@ -25,7 +25,7 @@ export function RegisterPage() {
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? '注册失败，请稍后重试';
+        ?? 'Registration failed. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
@@ -35,13 +35,13 @@ export function RegisterPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>注册</h2>
+        <h2 style={styles.title}>Create Account</h2>
 
         {error && <div style={styles.error}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
-            <label style={styles.label}>邮箱</label>
+            <label style={styles.label}>Email</label>
             <input
               style={styles.input}
               type="email"
@@ -53,36 +53,36 @@ export function RegisterPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>用户名</label>
+            <label style={styles.label}>Username</label>
             <input
               style={styles.input}
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="2-20 个字符"
+              placeholder="2–20 characters"
               required
             />
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>密码</label>
+            <label style={styles.label}>Password</label>
             <input
               style={styles.input}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="至少 6 个字符"
+              placeholder="At least 6 characters"
               required
             />
           </div>
 
           <button style={styles.button} type="submit" disabled={loading}>
-            {loading ? '注册中...' : '注册'}
+            {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
         <p style={styles.link}>
-          已有账号？<Link to="/login">去登录</Link>
+          Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
     </div>

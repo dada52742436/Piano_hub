@@ -14,6 +14,7 @@ It currently covers authentication, listing management, booking requests, saved 
 - Browse active listings without an account
 - Search by keyword
 - Filter by brand, condition, and price range
+- Sync search, filter, and pagination state to the URL
 - Paginated listing results
 - Listing detail pages
 
@@ -179,7 +180,6 @@ frontend/
 
 ## Roadmap
 
-- URL-synced search and filter state
 - Global search from the navbar
 - Stronger dashboard and activity views
 - Deployment hardening

@@ -25,7 +25,7 @@ export function LoginPage() {
       // 从 axios 错误中提取后端返回的 message
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? '登录失败，请稍后重试';
+        ?? 'Login failed. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
@@ -35,13 +35,13 @@ export function LoginPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>登录</h2>
+        <h2 style={styles.title}>Sign In</h2>
 
         {error && <div style={styles.error}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
-            <label style={styles.label}>邮箱</label>
+            <label style={styles.label}>Email</label>
             <input
               style={styles.input}
               type="email"
@@ -53,24 +53,24 @@ export function LoginPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>密码</label>
+            <label style={styles.label}>Password</label>
             <input
               style={styles.input}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="至少 6 个字符"
+              placeholder="At least 6 characters"
               required
             />
           </div>
 
           <button style={styles.button} type="submit" disabled={loading}>
-            {loading ? '登录中...' : '登录'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <p style={styles.link}>
-          还没有账号？<Link to="/register">去注册</Link>
+          Don't have an account? <Link to="/register">Sign up</Link>
         </p>
       </div>
     </div>
