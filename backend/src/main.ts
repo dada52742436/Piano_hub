@@ -1,22 +1,22 @@
-import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-  // 允许前端开发服务器（localhost:3000）跨域访问
+  // Allow one or more frontend origins to access the API.
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: corsOrigins,
     credentials: true,
   });
 
-  // 全局启用 DTO 校验管道
-  // whitelist: true              — 过滤掉 DTO 中未声明的字段，防止恶意注入
-  // forbidNonWhitelisted: true   — 遇到多余字段直接 400，而非静默忽略
-  // transform: true              — 自动将请求数据转成 DTO 实例（而非纯对象）
-  // enableImplicitConversion     — query string "1" → number 1，无需 @Type(() => Number)
+  // Apply DTO validation and transform incoming payloads automatically.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -26,11 +26,9 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger / OpenAPI 接口文档
-  // 访问地址： http://localhost:3001/docs
   const swaggerConfig = new DocumentBuilder()
     .setTitle('PianoHub API')
-    .setDescription('Melbourne second-hand piano trading platform — REST API reference')
+    .setDescription('Melbourne second-hand piano trading platform - REST API reference')
     .setVersion('1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -45,4 +43,5 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3001);
 }
+
 bootstrap();

@@ -132,6 +132,88 @@ App URLs:
 - Backend API: `http://localhost:3001`
 - Swagger: `http://localhost:3001/docs`
 
+## Deployment and production notes
+
+### Local development path
+
+Use this path when actively building features:
+
+- Run PostgreSQL locally
+- Start the backend with `npm run start:dev`
+- Start the frontend with `npm run dev`
+- Use `npx prisma migrate dev` during schema changes
+
+### Containerized app path
+
+Use this path when you want a more production-like local run:
+
+```bash
+docker compose up --build
+```
+
+What the current Docker setup does:
+
+- Starts PostgreSQL 16
+- Builds and runs the NestJS backend on port `3001`
+- Builds the React app and serves it with nginx on port `3000`
+- Proxies `/api` and `/uploads` from nginx to the backend
+- Persists PostgreSQL data and uploaded files through Docker volumes
+
+Important runtime behaviour:
+
+- Backend container runs `npx prisma migrate deploy` on startup
+- Seed is not executed automatically inside Docker
+- If you want demo data in containers, run:
+
+```bash
+docker compose exec backend npx prisma db seed
+```
+
+### Required environment variables
+
+Backend requires:
+
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+
+For production or public demos:
+
+- Use a strong `JWT_SECRET`
+- Do not keep the default Docker database password
+- Verify the backend database URL points to the correct database
+
+### Pre-deploy checklist
+
+Before treating a build as deployment-ready, verify:
+
+- Backend compiles with `npm run build`
+- Frontend compiles with `npm run build`
+- Backend unit tests pass
+- Backend e2e baseline passes
+- Prisma migrations are up to date
+- Seed is optional and only used for demos
+- Swagger loads correctly in the target environment
+- Image uploads persist in the chosen runtime environment
+
+### Current deployment scope
+
+At this stage, PianoHub is deployment-aware, but not fully production-hardened yet.
+The repository already includes:
+
+- Dockerfiles for frontend and backend
+- `docker-compose.yml`
+- nginx reverse proxy setup for the frontend container
+- Prisma migration-based startup for the backend container
+
+Still considered future hardening work:
+
+- production secret management
+- HTTPS / reverse proxy decisions outside local Docker
+- CI/CD automation
+- dedicated production environment guides by provider
+- stronger auth storage strategy than localStorage
+
 ## Testing
 
 Backend unit tests:
