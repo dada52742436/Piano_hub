@@ -35,6 +35,12 @@ It currently covers authentication, listing management, booking requests, saved 
 - Send lightweight inquiries to sellers
 - Track and close personal inquiries
 
+### Product experience
+
+- Use a shared app layout with a global navbar
+- View a dashboard with account stats, recent activity, and buyer/seller workspaces
+- Restore `/listings` search, filter, and pagination state from the URL
+
 ### Security and business rules
 
 - JWT authentication
@@ -181,6 +187,5 @@ frontend/
 ## Roadmap
 
 - Global search from the navbar
-- Stronger dashboard and activity views
 - Deployment hardening
 - Further marketplace UX refinement

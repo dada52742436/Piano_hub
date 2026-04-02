@@ -100,7 +100,7 @@ export function CreateListingPage() {
             name="description"
             value={form.description}
             onChange={handleChange}
-            placeholder="Describe the piano �?age, condition details, reason for selling..."
+            placeholder="Describe the piano: age, condition details, reason for selling..."
             required
           />
         </Field>
