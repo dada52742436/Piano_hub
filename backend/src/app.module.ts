@@ -12,6 +12,8 @@ import { ListingsModule } from './listings/listings.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { SavedListingsModule } from './saved-listings/saved-listings.module.js';
 import { InquiriesModule } from './inquiries/inquiries.module.js';
+import { TransactionsModule } from './transactions/transactions.module.js';
+import { PaymentsModule } from './payments/payments.module.js';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { InquiriesModule } from './inquiries/inquiries.module.js';
     BookingsModule,  // Booking lifecycle module
     SavedListingsModule,
     InquiriesModule,
+    TransactionsModule,
+    PaymentsModule,
   ],
   controllers: [AppController, ProtectedController],
   providers: [AppService],

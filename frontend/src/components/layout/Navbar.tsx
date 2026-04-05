@@ -5,8 +5,8 @@ export function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     navigate('/login');
   }
 
@@ -29,6 +29,8 @@ export function Navbar() {
               <NavItem to="/listings/mine">My Listings</NavItem>
               <NavItem to="/saved-listings/mine">Saved</NavItem>
               <NavItem to="/bookings/mine">My Bookings</NavItem>
+              <NavItem to="/transactions/mine">My Transactions</NavItem>
+              <NavItem to="/payments/mine">My Payments</NavItem>
               <NavItem to="/inquiries/mine">My Inquiries</NavItem>
               <NavItem to="/dashboard">Dashboard</NavItem>
               <div style={styles.userBlock}>

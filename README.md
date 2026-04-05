@@ -5,7 +5,7 @@ Portfolio-quality full-stack marketplace project for second-hand pianos in Melbo
 ## Overview
 
 PianoHub is built to feel more like a real evolving product than a CRUD demo.  
-It currently covers authentication, listing management, booking requests, saved listings, seller inquiries, listing images, and ownership-based access control.
+It currently covers authentication, listing management, bookings, saved listings, inquiries, transactions, a simulated payment layer, listing images, and ownership-based access control.
 
 ## Features
 
@@ -25,6 +25,9 @@ It currently covers authentication, listing management, booking requests, saved 
 - Upload and delete listing images
 - Review booking requests per listing
 - Review buyer inquiries per listing
+- Review transaction requests per listing
+- Review payment status per transaction
+- Progress a transaction from accepted deal flow to completion once payment is marked as paid
 
 ### Buyer workflows
 
@@ -34,21 +37,30 @@ It currently covers authentication, listing management, booking requests, saved 
 - Save listings for later
 - Send lightweight inquiries to sellers
 - Track and close personal inquiries
+- Start transactions on active listings
+- Track personal transaction status and deal progression
+- Use a simulated payment flow for accepted transactions
+- Review payment attempts from a dedicated `My Payments` page
 
 ### Product experience
 
 - Use a shared app layout with a global navbar
 - View a dashboard with account stats, recent activity, and buyer/seller workspaces
 - Restore `/listings` search, filter, and pagination state from the URL
+- Explain transaction expiry, release, and sold-state outcomes in the UI
+- Surface simulated payment status in transactions, payments, and dashboard views
 
 ### Security and business rules
 
-- JWT authentication
+- JWT authentication via `httpOnly` cookie sessions
 - bcrypt password hashing
 - Server-side ownership enforcement
 - Seller/buyer role behaviour expressed through foreign keys, not separate account types
 - Public marketplace only shows `active` listings
 - `sold` and `archived` listings cannot receive new bookings or inquiries
+- Transaction completion automatically marks the listing as `sold`
+- Completed transactions automatically close competing deal flows
+- Transactions can only be completed after a payment is marked as `paid`
 
 ## Tech stack
 
@@ -58,7 +70,7 @@ It currently covers authentication, listing management, booking requests, saved 
 | Backend | NestJS 11, TypeScript |
 | Database | PostgreSQL |
 | ORM | Prisma 7 |
-| Auth | JWT + bcrypt |
+| Auth | JWT + bcrypt + httpOnly cookie session |
 | HTTP | Axios |
 | API docs | Swagger |
 
@@ -212,7 +224,7 @@ Still considered future hardening work:
 - HTTPS / reverse proxy decisions outside local Docker
 - CI/CD automation
 - dedicated production environment guides by provider
-- stronger auth storage strategy than localStorage
+- real payment-provider integration beyond the current simulated payment flow
 
 ## Testing
 
@@ -239,8 +251,8 @@ cd frontend
 
 Current verified baseline:
 
-- unit tests: `43`
-- e2e tests: `53`
+- unit tests: `74`
+- e2e tests: `72`
 
 ## Project structure
 
@@ -253,8 +265,10 @@ backend/
     inquiries/
     listings/
       images/
+    payments/
     prisma/
     saved-listings/
+    transactions/
     users/
 frontend/
   src/
@@ -269,5 +283,7 @@ frontend/
 ## Roadmap
 
 - Global search from the navbar
-- Deployment hardening
+- Provider-specific deployment guides
+- Real payment provider integration
+- Payment dashboard and seller-side payment analytics refinement
 - Further marketplace UX refinement

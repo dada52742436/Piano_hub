@@ -30,7 +30,17 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
   return data;
 }
 
+export async function logout(): Promise<{ message: string }> {
+  const { data } = await authApi.post<{ message: string }>('/auth/logout');
+  return data;
+}
+
 export async function getProfile(): Promise<{ message: string; user: AuthResponse['user'] & { createdAt: string } }> {
   const { data } = await api.get('/protected/profile');
+  return data;
+}
+
+export async function getSessionProfile(): Promise<{ message: string; user: AuthResponse['user'] & { createdAt: string } }> {
+  const { data } = await authApi.get('/protected/profile');
   return data;
 }

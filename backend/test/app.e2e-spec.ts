@@ -16,6 +16,14 @@ describe('AuthController (e2e)', () => {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`;
   }
 
+  function extractAuthCookie(response: request.Response): string {
+    const cookies = response.headers['set-cookie'];
+    const authCookie = cookies?.find((cookie) => cookie.startsWith('access_token='));
+
+    expect(authCookie).toBeDefined();
+    return authCookie as string;
+  }
+
   async function registerUserAndGetToken(input: {
     email: string;
     username: string;
@@ -96,6 +104,68 @@ describe('AuthController (e2e)', () => {
         message: input.message ?? 'I would love to know if this piano is still available.',
       })
       .expect(201);
+  }
+
+  async function createTransaction(input: {
+    accessToken: string;
+    listingId: number;
+    offeredPrice?: number;
+    message?: string;
+  }): Promise<request.Response> {
+    return request(app.getHttpServer())
+      .post(`/listings/${input.listingId}/transactions`)
+      .set('Authorization', `Bearer ${input.accessToken}`)
+      .send({
+        offeredPrice: input.offeredPrice ?? 3200,
+        message: input.message ?? 'Ready to move forward with this deal.',
+      })
+      .expect(201);
+  }
+
+  async function createPayment(input: {
+    accessToken: string;
+    transactionId: number;
+    amount?: number;
+    providerPaymentId?: string;
+  }): Promise<request.Response> {
+    return request(app.getHttpServer())
+      .post(`/transactions/${input.transactionId}/payments`)
+      .set('Authorization', `Bearer ${input.accessToken}`)
+      .send({
+        amount: input.amount ?? 3200,
+        providerPaymentId: input.providerPaymentId,
+      })
+      .expect(201);
+  }
+
+  async function simulatePayment(input: {
+    accessToken: string;
+    paymentId: number;
+    status: 'paid' | 'failed' | 'cancelled';
+  }): Promise<request.Response> {
+    return request(app.getHttpServer())
+      .patch(`/payments/${input.paymentId}/simulate`)
+      .set('Authorization', `Bearer ${input.accessToken}`)
+      .send({
+        status: input.status,
+      });
+  }
+
+  async function updateTransactionStatus(input: {
+    accessToken: string;
+    transactionId: number;
+    status:
+      | 'seller_accepted'
+      | 'buyer_confirmed'
+      | 'completed'
+      | 'cancelled';
+  }): Promise<request.Response> {
+    return request(app.getHttpServer())
+      .patch(`/transactions/${input.transactionId}/status`)
+      .set('Authorization', `Bearer ${input.accessToken}`)
+      .send({
+        status: input.status,
+      });
   }
 
   async function updateInquiryStatus(input: {
@@ -204,6 +274,24 @@ describe('AuthController (e2e)', () => {
           },
         });
 
+        await prismaService.prisma.payment.deleteMany({
+          where: {
+            OR: [
+              { buyerId: { in: userIds } },
+              { transaction: { listing: { ownerId: { in: userIds } } } },
+            ],
+          },
+        });
+
+        await prismaService.prisma.transaction.deleteMany({
+          where: {
+            OR: [
+              { buyerId: { in: userIds } },
+              { listing: { ownerId: { in: userIds } } },
+            ],
+          },
+        });
+
         await prismaService.prisma.savedListing.deleteMany({
           where: {
             OR: [
@@ -265,6 +353,7 @@ describe('AuthController (e2e)', () => {
           username: 'e2e-user',
         });
         expect(response.body.user.id).toEqual(expect.any(Number));
+        expect(extractAuthCookie(response)).toContain('HttpOnly');
       });
   });
 
@@ -312,6 +401,7 @@ describe('AuthController (e2e)', () => {
           email,
           username: 'login-user',
         });
+        expect(extractAuthCookie(response)).toContain('HttpOnly');
       });
   });
 
@@ -351,6 +441,33 @@ describe('AuthController (e2e)', () => {
           username: 'profile-user',
         });
         expect(response.body.user.password).toBeUndefined();
+      });
+  });
+
+  it('GET /protected/profile should return the current user for a valid auth cookie', async () => {
+    const email = buildUniqueEmail('e2e-cookie-profile');
+
+    const registerResponse = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email,
+        username: 'cookie-user',
+        password: 'secret123',
+      })
+      .expect(201);
+
+    createdEmails.push(email);
+    const authCookie = extractAuthCookie(registerResponse);
+
+    return request(app.getHttpServer())
+      .get('/protected/profile')
+      .set('Cookie', authCookie)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.user).toMatchObject({
+          email,
+          username: 'cookie-user',
+        });
       });
   });
 
@@ -1961,5 +2078,1019 @@ describe('AuthController (e2e)', () => {
       .delete(`/listings/${listing.body.id}/images/999999`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(404);
+  });
+
+  it('POST /listings/:listingId/transactions should create a transaction for a valid buyer', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Transaction Target Listing',
+      description: 'Listing used to verify transaction creation.',
+      price: 3500,
+    });
+
+    const response = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3400,
+      message: 'Happy to proceed at this offer price.',
+    });
+
+    expect(response.body).toMatchObject({
+      listingId: listing.body.id,
+      buyerId: expect.any(Number),
+      offeredPrice: 3400,
+      status: 'initiated',
+      buyer: { username: 'txn-buyer' },
+      listing: {
+        title: 'Transaction Target Listing',
+        owner: { username: 'txn-seller' },
+      },
+    });
+  });
+
+  it('GET /transactions/mine should return only the current buyer transactions', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-mine-seller');
+    const buyerAEmail = buildUniqueEmail('e2e-transaction-mine-a');
+    const buyerBEmail = buildUniqueEmail('e2e-transaction-mine-b');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-mine-seller',
+    });
+    const buyerAToken = await registerUserAndGetToken({
+      email: buyerAEmail,
+      username: 'txn-buyer-a',
+    });
+    const buyerBToken = await registerUserAndGetToken({
+      email: buyerBEmail,
+      username: 'txn-buyer-b',
+    });
+
+    const listingA = await createListing({
+      accessToken: sellerToken,
+      title: 'Buyer A Transaction Target',
+      description: 'Used to check buyer transaction filtering.',
+    });
+    const listingB = await createListing({
+      accessToken: sellerToken,
+      title: 'Buyer B Transaction Target',
+      description: 'Used to check buyer transaction filtering.',
+    });
+
+    await createTransaction({
+      accessToken: buyerAToken,
+      listingId: listingA.body.id,
+      offeredPrice: 3000,
+      message: 'Buyer A transaction.',
+    });
+    await createTransaction({
+      accessToken: buyerBToken,
+      listingId: listingB.body.id,
+      offeredPrice: 3100,
+      message: 'Buyer B transaction.',
+    });
+
+    return request(app.getHttpServer())
+      .get('/transactions/mine')
+      .set('Authorization', `Bearer ${buyerAToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0]).toMatchObject({
+          message: 'Buyer A transaction.',
+          status: 'initiated',
+          listing: {
+            title: 'Buyer A Transaction Target',
+          },
+        });
+      });
+  });
+
+  it('GET /listings/:listingId/transactions should return transactions to the listing owner', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-view-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-view-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-view-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-view-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Seller Transaction View',
+      description: 'Listing used to verify seller transaction visibility.',
+    });
+
+    await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3300,
+      message: 'Can move quickly at this price.',
+    });
+
+    return request(app.getHttpServer())
+      .get(`/listings/${listing.body.id}/transactions`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0]).toMatchObject({
+          offeredPrice: 3300,
+          status: 'initiated',
+          buyer: {
+            username: 'txn-view-buyer',
+          },
+        });
+      });
+  });
+
+  it('POST /listings/:listingId/transactions should return 409 for a duplicate transaction', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-dup-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-dup-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-dup-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-dup-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Duplicate Transaction Target',
+      description: 'Listing used to verify duplicate transaction protection.',
+    });
+
+    await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3200,
+    });
+
+    return request(app.getHttpServer())
+      .post(`/listings/${listing.body.id}/transactions`)
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({
+        offeredPrice: 3250,
+        message: 'Second transaction attempt.',
+      })
+      .expect(409);
+  });
+
+  it('POST /listings/:listingId/transactions should allow a new transaction after the previous one is cancelled', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-restart-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-restart-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-restart-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-restart-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Restart Transaction Target',
+      description: 'Listing used to verify a new transaction can start after cancellation.',
+    });
+
+    const firstTransaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3400,
+      message: 'First transaction attempt.',
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: firstTransaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    const firstPayment = await createPayment({
+      accessToken: buyerToken,
+      transactionId: firstTransaction.body.id,
+      amount: 3400,
+    });
+
+    await simulatePayment({
+      accessToken: buyerToken,
+      paymentId: firstPayment.body.id,
+      status: 'paid',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('paid');
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: firstTransaction.body.id,
+      status: 'cancelled',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('cancelled');
+    });
+
+    return request(app.getHttpServer())
+      .post(`/listings/${listing.body.id}/transactions`)
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({
+        offeredPrice: 3450,
+        message: 'Starting a replacement transaction after the previous one was cancelled.',
+      })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body.id).not.toBe(firstTransaction.body.id);
+        expect(response.body.status).toBe('initiated');
+        expect(response.body.offeredPrice).toBe(3450);
+      });
+  });
+
+  it('POST /listings/:listingId/transactions should return 400 for your own listing', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-own');
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-own-seller',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Own Transaction Target',
+      description: 'Listing used to verify owners cannot start their own transaction.',
+    });
+
+    return request(app.getHttpServer())
+      .post(`/listings/${listing.body.id}/transactions`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        offeredPrice: 3000,
+        message: 'Trying to transact on my own listing.',
+      })
+      .expect(400);
+  });
+
+  it('PATCH /transactions/:id/status should allow the seller to accept an initiated transaction', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-accept-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-accept-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-acc-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-acc-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Accept Transaction Listing',
+      description: 'Listing used to verify seller acceptance of a transaction.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3300,
+    });
+
+    return updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('seller_accepted');
+      expect(response.body.expiresAt).toEqual(expect.any(String));
+    });
+  });
+
+  it('PATCH /transactions/:id/status should allow the buyer to confirm a seller-accepted transaction', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-confirm-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-confirm-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-conf-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-conf-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Confirm Transaction Listing',
+      description: 'Listing used to verify buyer confirmation of a transaction.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3400,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    return updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('buyer_confirmed');
+    });
+  });
+
+  it('PATCH /transactions/:id/status should mark the listing as sold when the seller completes it', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-complete-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-complete-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-comp-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-comp-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Complete Transaction Listing',
+      description: 'Listing used to verify completion marks the listing as sold.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3450,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    const payment = await createPayment({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      amount: 3450,
+    });
+
+    await simulatePayment({
+      accessToken: buyerToken,
+      paymentId: payment.body.id,
+      status: 'paid',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('paid');
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'completed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('completed');
+      expect(response.body.listing.status).toBe('sold');
+    });
+
+    return request(app.getHttpServer())
+      .get(`/listings/${listing.body.id}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.status).toBe('sold');
+      });
+  });
+
+  it('PATCH /transactions/:id/status should return 400 when no paid payment exists yet', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-no-payment-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-no-payment-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-pay-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-pay-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment Required Transaction Listing',
+      description: 'Listing used to verify completion now requires a paid payment.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3300,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    return updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'completed',
+    }).then((response) => {
+      expect(response.status).toBe(400);
+    });
+  });
+
+  it('POST /transactions/:transactionId/payments should create a simulated payment for the buyer', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-payment-create-seller');
+    const buyerEmail = buildUniqueEmail('e2e-payment-create-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'pay-create-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'pay-create-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment Create Listing',
+      description: 'Listing used to verify simulated payment creation.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3250,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    const payment = await createPayment({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      amount: 3250,
+      providerPaymentId: 'sim-pay-001',
+    });
+
+    expect(payment.body).toMatchObject({
+      transactionId: transaction.body.id,
+      buyerId: expect.any(Number),
+      amount: 3250,
+      provider: 'simulated',
+      providerPaymentId: 'sim-pay-001',
+      status: 'pending',
+    });
+  });
+
+  it('GET /payments/mine should return only the current buyer payments', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-payment-mine-seller');
+    const buyerAEmail = buildUniqueEmail('e2e-payment-mine-a');
+    const buyerBEmail = buildUniqueEmail('e2e-payment-mine-b');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'pay-mine-seller',
+    });
+    const buyerAToken = await registerUserAndGetToken({
+      email: buyerAEmail,
+      username: 'pay-mine-a',
+    });
+    const buyerBToken = await registerUserAndGetToken({
+      email: buyerBEmail,
+      username: 'pay-mine-b',
+    });
+
+    const listingA = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment Mine Listing A',
+      description: 'First payment listing for buyer filtering.',
+    });
+    const listingB = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment Mine Listing B',
+      description: 'Second payment listing for buyer filtering.',
+    });
+
+    const transactionA = await createTransaction({
+      accessToken: buyerAToken,
+      listingId: listingA.body.id,
+      offeredPrice: 3000,
+    });
+    const transactionB = await createTransaction({
+      accessToken: buyerBToken,
+      listingId: listingB.body.id,
+      offeredPrice: 3100,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transactionA.body.id,
+      status: 'seller_accepted',
+    });
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transactionB.body.id,
+      status: 'seller_accepted',
+    });
+
+    await createPayment({
+      accessToken: buyerAToken,
+      transactionId: transactionA.body.id,
+      amount: 3000,
+    });
+    await createPayment({
+      accessToken: buyerBToken,
+      transactionId: transactionB.body.id,
+      amount: 3100,
+    });
+
+    return request(app.getHttpServer())
+      .get('/payments/mine')
+      .set('Authorization', `Bearer ${buyerAToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0]).toMatchObject({
+          amount: 3000,
+          transaction: {
+            listing: {
+              title: 'Payment Mine Listing A',
+            },
+          },
+        });
+      });
+  });
+
+  it('GET /transactions/:transactionId/payments should return payments to a transaction party', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-payment-view-seller');
+    const buyerEmail = buildUniqueEmail('e2e-payment-view-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'pay-view-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'pay-view-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment View Listing',
+      description: 'Listing used to verify transaction payment visibility.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3150,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    });
+
+    await createPayment({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      amount: 3150,
+    });
+
+    return request(app.getHttpServer())
+      .get(`/transactions/${transaction.body.id}/payments`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0]).toMatchObject({
+          amount: 3150,
+          status: 'pending',
+        });
+      });
+  });
+
+  it('PATCH /payments/:id/simulate should allow the buyer to mark a payment as paid', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-payment-paid-seller');
+    const buyerEmail = buildUniqueEmail('e2e-payment-paid-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'pay-paid-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'pay-paid-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Payment Simulate Listing',
+      description: 'Listing used to verify simulated payment success.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3220,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    });
+
+    const payment = await createPayment({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      amount: 3220,
+    });
+
+    return simulatePayment({
+      accessToken: buyerToken,
+      paymentId: payment.body.id,
+      status: 'paid',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('paid');
+      expect(response.body.paidAt).toEqual(expect.any(String));
+    });
+  });
+
+  it('PATCH /transactions/:id/status should close competing deal flows when a transaction completes', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-closeflows-seller');
+    const winningBuyerEmail = buildUniqueEmail('e2e-transaction-closeflows-win');
+    const otherBuyerEmail = buildUniqueEmail('e2e-transaction-closeflows-other');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-flow-seller',
+    });
+    const winningBuyerToken = await registerUserAndGetToken({
+      email: winningBuyerEmail,
+      username: 'txn-flow-win',
+    });
+    const otherBuyerToken = await registerUserAndGetToken({
+      email: otherBuyerEmail,
+      username: 'txn-flow-other',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Close Competing Deal Flows Listing',
+      description: 'Listing used to verify competing deal flows are closed after completion.',
+    });
+
+    const winningTransaction = await createTransaction({
+      accessToken: winningBuyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3600,
+      message: 'Winning buyer offer.',
+    });
+
+    const competingTransaction = await createTransaction({
+      accessToken: otherBuyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3550,
+      message: 'Competing buyer offer.',
+    });
+
+    const competingBooking = await createBooking({
+      accessToken: otherBuyerToken,
+      listingId: listing.body.id,
+      message: 'Competing buyer booking.',
+    });
+
+    const competingInquiry = await createInquiry({
+      accessToken: otherBuyerToken,
+      listingId: listing.body.id,
+      message: 'Competing buyer inquiry.',
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: winningTransaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await updateTransactionStatus({
+      accessToken: winningBuyerToken,
+      transactionId: winningTransaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    const payment = await createPayment({
+      accessToken: winningBuyerToken,
+      transactionId: winningTransaction.body.id,
+      amount: 3600,
+    });
+
+    await simulatePayment({
+      accessToken: winningBuyerToken,
+      paymentId: payment.body.id,
+      status: 'paid',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: winningTransaction.body.id,
+      status: 'completed',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('completed');
+    });
+
+    await request(app.getHttpServer())
+      .get(`/listings/${listing.body.id}/transactions`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200)
+      .expect((response) => {
+        const loser = response.body.find(
+          (transaction: { id: number }) => transaction.id === competingTransaction.body.id,
+        );
+        expect(loser).toMatchObject({
+          status: 'cancelled',
+        });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/listings/${listing.body.id}/bookings`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200)
+      .expect((response) => {
+        const booking = response.body.find(
+          (item: { id: number }) => item.id === competingBooking.body.id,
+        );
+        expect(booking).toMatchObject({
+          status: 'rejected',
+        });
+      });
+
+    return request(app.getHttpServer())
+      .get('/inquiries/mine')
+      .set('Authorization', `Bearer ${otherBuyerToken}`)
+      .expect(200)
+      .expect((response) => {
+        const inquiry = response.body.find(
+          (item: { id: number }) => item.id === competingInquiry.body.id,
+        );
+        expect(inquiry).toMatchObject({
+          status: 'closed',
+        });
+      });
+  });
+
+  it('PATCH /transactions/:id/status should allow cancelling a non-terminal transaction', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-cancel-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-cancel-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-can-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-can-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Cancel Transaction Listing',
+      description: 'Listing used to verify cancelling a transaction.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3350,
+    });
+
+    return updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'cancelled',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('cancelled');
+    });
+  });
+
+  it('PATCH /transactions/:id/status should return 400 for an invalid transition', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-invalid-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-invalid-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-inv-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-inv-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Invalid Transaction Transition',
+      description: 'Listing used to verify invalid transaction transitions.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3200,
+    });
+
+    return updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(400);
+    });
+  });
+
+  it('GET /transactions/mine should auto-release expired seller-accepted transactions', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-expire-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-expire-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-exp-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-exp-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Expire Transaction Listing',
+      description: 'Listing used to verify expired accepted transactions are released.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3150,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await prismaService.prisma.transaction.update({
+      where: { id: transaction.body.id },
+      data: {
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    return request(app.getHttpServer())
+      .get('/transactions/mine')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0]).toMatchObject({
+          id: transaction.body.id,
+          status: 'cancelled',
+        });
+      });
+  });
+
+  it('PATCH /transactions/:id/status should return 400 when a seller-accepted transaction has expired', async () => {
+    const sellerEmail = buildUniqueEmail('e2e-transaction-expire-update-seller');
+    const buyerEmail = buildUniqueEmail('e2e-transaction-expire-update-buyer');
+
+    const sellerToken = await registerUserAndGetToken({
+      email: sellerEmail,
+      username: 'txn-exu-seller',
+    });
+    const buyerToken = await registerUserAndGetToken({
+      email: buyerEmail,
+      username: 'txn-exu-buyer',
+    });
+
+    const listing = await createListing({
+      accessToken: sellerToken,
+      title: 'Expired Update Transaction Listing',
+      description: 'Listing used to verify expired transactions cannot continue.',
+    });
+
+    const transaction = await createTransaction({
+      accessToken: buyerToken,
+      listingId: listing.body.id,
+      offeredPrice: 3180,
+    });
+
+    await updateTransactionStatus({
+      accessToken: sellerToken,
+      transactionId: transaction.body.id,
+      status: 'seller_accepted',
+    }).then((response) => {
+      expect(response.status).toBe(200);
+    });
+
+    await prismaService.prisma.transaction.update({
+      where: { id: transaction.body.id },
+      data: {
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    await updateTransactionStatus({
+      accessToken: buyerToken,
+      transactionId: transaction.body.id,
+      status: 'buyer_confirmed',
+    }).then((response) => {
+      expect(response.status).toBe(400);
+    });
+
+    return request(app.getHttpServer())
+      .get('/transactions/mine')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body[0]).toMatchObject({
+          id: transaction.body.id,
+          status: 'cancelled',
+        });
+      });
   });
 });

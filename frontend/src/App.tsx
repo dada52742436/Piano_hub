@@ -7,13 +7,16 @@ import { EditListingPage } from './pages/EditListingPage';
 import { ListingBookingsPage } from './pages/ListingBookingsPage';
 import { ListingDetailPage } from './pages/ListingDetailPage';
 import { ListingInquiriesPage } from './pages/ListingInquiriesPage';
+import { ListingTransactionsPage } from './pages/ListingTransactionsPage';
 import { ListingsPage } from './pages/ListingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { CreateListingPage } from './pages/CreateListingPage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
 import { MyInquiriesPage } from './pages/MyInquiriesPage';
 import { MyListingsPage } from './pages/MyListingsPage';
+import { MyPaymentsPage } from './pages/MyPaymentsPage';
 import { MySavedListingsPage } from './pages/MySavedListingsPage';
+import { MyTransactionsPage } from './pages/MyTransactionsPage';
 import { RegisterPage } from './pages/RegisterPage';
 
 function App() {
@@ -70,10 +73,26 @@ function App() {
               }
             />
             <Route
+              path="/transactions/mine"
+              element={
+                <ProtectedRoute>
+                  <MyTransactionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/inquiries/mine"
               element={
                 <ProtectedRoute>
                   <MyInquiriesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments/mine"
+              element={
+                <ProtectedRoute>
+                  <MyPaymentsPage />
                 </ProtectedRoute>
               }
             />
@@ -98,6 +117,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ListingInquiriesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/listings/:id/transactions"
+              element={
+                <ProtectedRoute>
+                  <ListingTransactionsPage />
                 </ProtectedRoute>
               }
             />

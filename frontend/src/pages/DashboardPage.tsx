@@ -4,6 +4,7 @@ import { getProfile } from '../api/auth';
 import { getMyBookings, type Booking } from '../api/bookings';
 import { getMyInquiries, type Inquiry } from '../api/inquiries';
 import { getMyListings, type Listing } from '../api/listings';
+import { getMyPayments, type Payment } from '../api/payments';
 import { getMySavedListings, type SavedListingRecord } from '../api/savedListings';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -33,6 +34,8 @@ interface DashboardStats {
   acceptedBookings: number;
   openInquiries: number;
   closedInquiries: number;
+  pendingPayments: number;
+  paidPayments: number;
 }
 
 type ActivityItem = {
@@ -61,13 +64,14 @@ export function DashboardPage() {
       getMySavedListings(),
       getMyBookings(),
       getMyInquiries(),
+      getMyPayments(),
     ])
-      .then(([profileData, listings, savedListings, bookings, inquiries]) => {
+      .then(([profileData, listings, savedListings, bookings, inquiries, payments]) => {
         if (cancelled) return;
 
         setProfile(profileData);
-        setStats(buildStats(listings, savedListings, bookings, inquiries));
-        setRecentActivity(buildRecentActivity(listings, savedListings, bookings, inquiries));
+        setStats(buildStats(listings, savedListings, bookings, inquiries, payments));
+        setRecentActivity(buildRecentActivity(listings, savedListings, bookings, inquiries, payments));
       })
       .catch(() => {
         if (!cancelled) {
@@ -85,8 +89,8 @@ export function DashboardPage() {
     };
   }, []);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     navigate('/login');
   }
 
@@ -119,6 +123,7 @@ export function DashboardPage() {
             <StatCard label="Saved Listings" value={stats.savedListings} hint="Your shortlist" />
             <StatCard label="Pending Bookings" value={stats.pendingBookings} hint="Buyer-side requests" />
             <StatCard label="Open Inquiries" value={stats.openInquiries} hint="Buyer-side conversations" />
+            <StatCard label="Pending Payments" value={stats.pendingPayments} hint={`${stats.paidPayments} paid`} />
           </div>
 
           <div style={styles.contentGrid}>
@@ -238,6 +243,13 @@ export function DashboardPage() {
                     {stats.closedInquiries === 1 ? 'y' : 'ies'}
                   </span>
                 </div>
+                <div style={styles.workspaceItem}>
+                  <strong style={styles.workspaceLabel}>Payment pipeline</strong>
+                  <span style={styles.workspaceValue}>
+                    {stats.pendingPayments} pending and {stats.paidPayments} paid payment
+                    {stats.pendingPayments + stats.paidPayments !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
               <div style={styles.quickLinks}>
                 <Link to="/saved-listings/mine" style={styles.quickLink}>
@@ -248,6 +260,9 @@ export function DashboardPage() {
                 </Link>
                 <Link to="/inquiries/mine" style={styles.quickLink}>
                   Open Inquiry Pipeline
+                </Link>
+                <Link to="/payments/mine" style={styles.quickLink}>
+                  Review Payment Attempts
                 </Link>
               </div>
             </section>
@@ -288,6 +303,9 @@ export function DashboardPage() {
                 </Link>
                 <Link to="/inquiries/mine" style={styles.quickLink}>
                   Review My Inquiries
+                </Link>
+                <Link to="/payments/mine" style={styles.quickLink}>
+                  Review My Payments
                 </Link>
                 <Link to="/listings" style={styles.quickLink}>
                   Browse Marketplace
@@ -333,6 +351,7 @@ function buildStats(
   savedListings: SavedListingRecord[],
   bookings: Booking[],
   inquiries: Inquiry[],
+  payments: Payment[],
 ): DashboardStats {
   return {
     totalListings: listings.length,
@@ -344,6 +363,8 @@ function buildStats(
     acceptedBookings: bookings.filter((item) => item.status === 'accepted').length,
     openInquiries: inquiries.filter((item) => item.status === 'open').length,
     closedInquiries: inquiries.filter((item) => item.status === 'closed').length,
+    pendingPayments: payments.filter((item) => item.status === 'pending').length,
+    paidPayments: payments.filter((item) => item.status === 'paid').length,
   };
 }
 
@@ -352,6 +373,7 @@ function buildRecentActivity(
   savedListings: SavedListingRecord[],
   bookings: Booking[],
   inquiries: Inquiry[],
+  payments: Payment[],
 ): ActivityItem[] {
   const listingItems: ActivityItem[] = listings.map((item) => ({
     id: `listing-${item.id}`,
@@ -385,7 +407,15 @@ function buildRecentActivity(
     link: '/inquiries/mine',
   }));
 
-  return [...listingItems, ...savedItems, ...bookingItems, ...inquiryItems]
+  const paymentItems: ActivityItem[] = payments.map((item) => ({
+    id: `payment-${item.id}`,
+    title: item.transaction?.listing?.title ?? `Transaction #${item.transactionId}`,
+    meta: `Payment ${item.status}`,
+    date: item.updatedAt,
+    link: '/payments/mine',
+  }));
+
+  return [...listingItems, ...savedItems, ...bookingItems, ...inquiryItems, ...paymentItems]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
 }

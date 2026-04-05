@@ -51,6 +51,32 @@ enum InquiryStatus {
   closed
 }
 
+// Status of a purchase transaction between a buyer and a seller.
+// initiated        = buyer has submitted a purchase intent
+// seller_accepted  = seller agreed to move forward
+// buyer_confirmed  = buyer confirmed the deal details
+// completed        = the sale has been completed
+// cancelled        = either party stopped the transaction before completion
+enum TransactionStatus {
+  initiated
+  seller_accepted
+  buyer_confirmed
+  completed
+  cancelled
+}
+
+// Status of a payment attempt tied to a transaction.
+// pending   = payment intent/session created but not settled yet
+// paid      = funds successfully captured in the simulated flow
+// failed    = payment attempt failed
+// cancelled = payment flow cancelled before completion
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  cancelled
+}
+
 // ── User ──────────────────────────────────────────────────────────────────────
 model User {
   id        Int       @id @default(autoincrement())
@@ -71,6 +97,12 @@ model User {
 
   // Inquiries this user has sent as an interested buyer
   inquiries Inquiry[] @relation("InquiryRequester")
+
+  // Transactions this user has initiated as a buyer
+  transactions Transaction[] @relation("TransactionBuyer")
+
+  // Payments this user has initiated as the paying buyer
+  payments Payment[] @relation("PaymentBuyer")
 
   @@map("users")
 }
@@ -105,6 +137,9 @@ model Listing {
 
   // Contact requests submitted against this listing
   inquiries   Inquiry[]
+
+  // Purchase transactions started against this listing
+  transactions Transaction[]
 
   @@map("listings")
 }
@@ -181,4 +216,46 @@ model Inquiry {
 
   @@unique([listingId, requesterId])
   @@map("inquiries")
+}
+
+// Stores a purchase intent / deal flow between a buyer and the seller of a listing.
+// This is the business transaction layer, intentionally separate from payment integration.
+model Transaction {
+  id           Int               @id @default(autoincrement())
+  listingId    Int
+  buyerId      Int
+  offeredPrice Float
+  message      String?
+  status       TransactionStatus @default(initiated)
+  sellerAcceptedAt DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  listing      Listing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer        User              @relation("TransactionBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@index([listingId, buyerId])
+  @@map("transactions")
+}
+
+// Stores a payment attempt linked to a transaction.
+// In phase 1 this is a simulated payment layer, not a real payment provider integration yet.
+model Payment {
+  id                Int           @id @default(autoincrement())
+  transactionId     Int
+  buyerId           Int
+  amount            Float
+  provider          String        @default("simulated")
+  providerPaymentId String?
+  status            PaymentStatus @default(pending)
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  transaction       Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  buyer             User          @relation("PaymentBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
 }

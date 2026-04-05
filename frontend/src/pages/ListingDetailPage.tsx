@@ -10,6 +10,7 @@ import {
   type Listing,
 } from '../api/listings';
 import { getMySavedListings, removeSavedListing, saveListing } from '../api/savedListings';
+import { createTransaction, getMyTransactions, type TransactionStatus } from '../api/transactions';
 import { CONDITION_LABELS } from '../constants/conditions';
 import { LISTING_STATUS_LABELS } from '../constants/listingStatus';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +41,12 @@ export function ListingDetailPage() {
   const [inquirySuccess, setInquirySuccess] = useState(false);
   const [inquiryError, setInquiryError] = useState('');
   const [existingInquiryStatus, setExistingInquiryStatus] = useState<InquiryStatus | null>(null);
+  const [transactionPrice, setTransactionPrice] = useState('');
+  const [transactionMsg, setTransactionMsg] = useState('');
+  const [transactionSubmitting, setTransactionSubmitting] = useState(false);
+  const [transactionSuccess, setTransactionSuccess] = useState(false);
+  const [transactionError, setTransactionError] = useState('');
+  const [existingTransactionStatus, setExistingTransactionStatus] = useState<TransactionStatus | null>(null);
 
   const [isSaved, setIsSaved] = useState(false);
   const [saveSubmitting, setSaveSubmitting] = useState(false);
@@ -73,15 +80,22 @@ export function ListingDetailPage() {
   useEffect(() => {
     if (!listing || !user || user.id === listing.ownerId) {
       setExistingInquiryStatus(null);
+      setExistingTransactionStatus(null);
       return;
     }
 
-    getMyInquiries()
-      .then((items) => {
+    Promise.all([getMyInquiries(), getMyTransactions()])
+      .then(([items, transactions]) => {
         const existingInquiry = items.find((item) => item.listingId === listing.id);
         setExistingInquiryStatus(existingInquiry?.status ?? null);
         if (existingInquiry) {
           setInquirySuccess(true);
+        }
+
+        const existingTransaction = transactions.find((item) => item.listingId === listing.id);
+        setExistingTransactionStatus(existingTransaction?.status ?? null);
+        if (existingTransaction) {
+          setTransactionSuccess(true);
         }
       })
       .catch(() => {
@@ -130,6 +144,37 @@ export function ListingDetailPage() {
       );
     } finally {
       setInquirySubmitting(false);
+    }
+  }
+
+  async function handleTransaction(e: React.FormEvent) {
+    e.preventDefault();
+    if (!listing) return;
+
+    const offeredPrice = Number(transactionPrice);
+    if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+      setTransactionError('Please enter a valid offer price.');
+      return;
+    }
+
+    setTransactionError('');
+    setTransactionSubmitting(true);
+    try {
+      await createTransaction(listing.id, {
+        offeredPrice,
+        message: transactionMsg.trim() || undefined,
+      });
+      setTransactionSuccess(true);
+      setExistingTransactionStatus('initiated');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string | string[] } } })
+          ?.response?.data?.message;
+      setTransactionError(
+        Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Failed to start transaction.'),
+      );
+    } finally {
+      setTransactionSubmitting(false);
     }
   }
 
@@ -244,6 +289,9 @@ export function ListingDetailPage() {
               <Link to={`/listings/${listing.id}/inquiries`} style={styles.btnEdit}>
                 View Inquiries
               </Link>
+              <Link to={`/listings/${listing.id}/transactions`} style={styles.btnEdit}>
+                View Transactions
+              </Link>
               <button
                 style={styles.btnDelete}
                 onClick={() => void handleDelete()}
@@ -355,6 +403,83 @@ export function ListingDetailPage() {
           </div>
         </section>
       </div>
+
+      {isOwner ? (
+        <div style={styles.secondaryCard}>
+          <h4 style={styles.sectionLabel}>Transaction Requests</h4>
+          <p style={styles.cardHint}>
+            Transactions represent a stronger deal flow than an inquiry or booking request and can lead directly to a sold listing. Once one transaction is completed, other open transactions, bookings, and inquiries on this listing are closed automatically.
+          </p>
+          <Link to={`/listings/${listing.id}/transactions`} style={styles.btnViewCardAction}>
+            View Transactions for This Listing
+          </Link>
+        </div>
+      ) : user ? (
+        <div style={styles.secondaryCard}>
+          <h4 style={styles.sectionLabel}>Start a Transaction</h4>
+          {existingTransactionStatus ? (
+            <div style={styles.inquiryStateBox}>
+              <p style={styles.inquiryStateText}>
+                You already have a transaction on this listing.
+              </p>
+              <p style={styles.inquiryStateMeta}>
+                Current status: <strong>{existingTransactionStatus.replaceAll('_', ' ')}</strong>. Review it in <Link to="/transactions/mine" style={styles.inlineLink}>My Transactions</Link>.
+              </p>
+              {existingTransactionStatus === 'cancelled' && listing.status === 'sold' && (
+                <p style={{ ...styles.inquiryStateMeta, marginTop: 8 }}>
+                  Another transaction has already completed, so this listing is no longer available.
+                </p>
+              )}
+            </div>
+          ) : transactionSuccess ? (
+            <p style={styles.bookingSuccess}>
+              Transaction started. <Link to="/transactions/mine" style={{ color: '#15803d' }}>View My Transactions</Link>.
+            </p>
+          ) : (
+            <form onSubmit={handleTransaction}>
+              {transactionError && <p style={styles.bookingError}>{transactionError}</p>}
+              <div style={{ marginBottom: 12 }}>
+                <label style={styles.textareaLabel}>Offer price</label>
+                <input
+                  style={styles.input}
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={transactionPrice}
+                  onChange={(e) => setTransactionPrice(e.target.value)}
+                  placeholder={listing.price.toString()}
+                  required
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={styles.textareaLabel}>
+                  Message to seller <span style={styles.labelHint}>(optional, max 500 chars)</span>
+                </label>
+                <textarea
+                  style={styles.textarea}
+                  value={transactionMsg}
+                  onChange={(e) => setTransactionMsg(e.target.value)}
+                  placeholder="e.g. I am ready to move quickly if this offer works for you."
+                  maxLength={500}
+                />
+              </div>
+              <button
+                type="submit"
+                style={styles.btnSecondaryAction}
+                disabled={transactionSubmitting}
+              >
+                {transactionSubmitting ? 'Starting...' : 'Start Transaction'}
+              </button>
+            </form>
+          )}
+        </div>
+      ) : (
+        <div style={styles.secondaryCard}>
+          <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+            <Link to="/login" style={{ color: '#2563eb' }}>Log in</Link> to start a transaction.
+          </p>
+        </div>
+      )}
 
       {isOwner ? (
         <div style={styles.secondaryCard}>
@@ -597,6 +722,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%', minHeight: 80, padding: '8px 12px',
     border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14,
     resize: 'vertical', boxSizing: 'border-box',
+  },
+  input: {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: 6,
+    fontSize: 14,
+    boxSizing: 'border-box',
   },
   btnBook: {
     padding: '8px 20px', background: '#2563eb', color: '#fff',

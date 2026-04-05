@@ -1,34 +1,62 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Res,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AuthService, type AuthResponse } from './auth.service.js';
-import { RegisterDto } from './dto/register.dto.js';
+import { clearAuthCookie, setAuthCookie } from './auth-cookie.util.js';
 import { LoginDto } from './dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
 
-// Controller 只负责：接收请求、调用 Service、返回结果
-// 所有业务逻辑（加密、token签发等）都在 AuthService 里
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // POST /auth/register
-  // 默认 HTTP 状态码是 201 Created，注册语义上是创建资源，201 正确
   @Post('register')
   @ApiOperation({ summary: 'Register a new user account' })
-  @ApiResponse({ status: 201, description: 'Registration successful — returns JWT + user info' })
+  @ApiResponse({
+    status: 201,
+    description: 'Registration successful - returns JWT + user info and sets the auth cookie',
+  })
   @ApiResponse({ status: 409, description: 'Email already registered' })
-  register(@Body() dto: RegisterDto): Promise<AuthResponse> {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponse> {
+    const result = await this.authService.register(dto);
+    setAuthCookie(response, result.accessToken);
+    return result;
   }
 
-  // POST /auth/login
-  // @HttpCode(200)：登录不是创建资源，返回 200 比 201 更准确
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email + password' })
-  @ApiResponse({ status: 200, description: 'Login successful — returns JWT + user info' })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful - returns JWT + user info and sets the auth cookie',
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  login(@Body() dto: LoginDto): Promise<AuthResponse> {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponse> {
+    const result = await this.authService.login(dto);
+    setAuthCookie(response, result.accessToken);
+    return result;
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Clear the auth cookie' })
+  @ApiResponse({ status: 200, description: 'Logout successful' })
+  logout(@Res({ passthrough: true }) response: Response): { message: string } {
+    clearAuthCookie(response);
+    return { message: 'Logged out successfully' };
   }
 }
