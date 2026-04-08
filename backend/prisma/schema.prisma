@@ -70,11 +70,13 @@ enum TransactionStatus {
 // paid      = funds successfully captured in the simulated flow
 // failed    = payment attempt failed
 // cancelled = payment flow cancelled before completion
+// refunded  = Stripe payment was successfully refunded after transaction cancellation
 enum PaymentStatus {
   pending
   paid
   failed
   cancelled
+  refunded
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -248,7 +250,9 @@ model Payment {
   buyerId           Int
   amount            Float
   provider          String        @default("simulated")
+  providerCheckoutSessionId String?
   providerPaymentId String?
+  checkoutUrl       String?
   status            PaymentStatus @default(pending)
   paidAt            DateTime?
   createdAt         DateTime      @default(now())
@@ -257,5 +261,7 @@ model Payment {
   transaction       Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   buyer             User          @relation("PaymentBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
 
+  @@index([providerCheckoutSessionId])
+  @@index([providerPaymentId])
   @@map("payments")
 }

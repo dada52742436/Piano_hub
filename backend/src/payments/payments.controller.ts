@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
+  HttpCode,
   Param,
   ParseIntPipe,
   Patch,
@@ -34,6 +36,15 @@ export class PaymentsController {
     return this.paymentsService.create(transactionId, req.user.id, dto);
   }
 
+  @Post('transactions/:transactionId/payments/checkout-session')
+  @UseGuards(JwtAuthGuard)
+  createCheckoutSession(
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.createCheckoutSession(transactionId, req.user.id);
+  }
+
   @Get('payments/mine')
   @UseGuards(JwtAuthGuard)
   findMine(@Req() req: AuthenticatedRequest) {
@@ -57,5 +68,17 @@ export class PaymentsController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.paymentsService.simulateStatus(id, dto.status, req.user.id);
+  }
+
+  @Post('payments/webhook')
+  @HttpCode(200)
+  handleWebhook(
+    @Headers('stripe-signature') signature: string | string[] | undefined,
+    @Req() req: Request & { rawBody?: Buffer },
+  ) {
+    return this.paymentsService.handleStripeWebhook(
+      req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {})),
+      signature,
+    );
   }
 }

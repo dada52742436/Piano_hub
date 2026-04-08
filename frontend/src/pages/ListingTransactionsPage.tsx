@@ -4,6 +4,7 @@ import { getListingById, type Listing } from '../api/listings';
 import { getTransactionPayments, type Payment, type PaymentStatus } from '../api/payments';
 import {
   getListingTransactions,
+  issueSellerRefund,
   updateTransactionStatus,
   type Transaction,
   type TransactionStatus,
@@ -28,6 +29,7 @@ const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   paid: 'Payment Paid',
   failed: 'Payment Failed',
   cancelled: 'Payment Cancelled',
+  refunded: 'Payment Refunded',
 };
 
 function statusStyle(status: TransactionStatus): React.CSSProperties {
@@ -48,6 +50,7 @@ function paymentStatusStyle(status: PaymentStatus): React.CSSProperties {
     paid: { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' },
     failed: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
     cancelled: { background: '#f9fafb', color: '#6b7280', border: '1px solid #e5e7eb' },
+    refunded: { background: '#faf5ff', color: '#7e22ce', border: '1px solid #e9d5ff' },
   };
 
   return { ...styles.badge, ...map[status] };
@@ -90,7 +93,7 @@ function buildSellerNotice(
   if (transaction.status === 'buyer_confirmed') {
     return {
       tone: 'neutral',
-      text: 'The buyer confirmed the deal. You can now complete the sale or cancel it.',
+      text: 'The buyer confirmed the deal. You can now complete the sale. If you cannot fulfil the order after payment, use "Issue Refund" instead of Cancel.',
     };
   }
 
@@ -143,7 +146,14 @@ function buildPaymentNotice(
   if (payment.status === 'paid') {
     return {
       tone: 'neutral',
-      text: 'Payment is marked as paid. This transaction is now ready for final completion.',
+      text: 'Payment is marked as paid. This transaction is ready for completion. If you cannot fulfil the order, use "Issue Refund" to return the buyer\'s payment.',
+    };
+  }
+
+  if (payment.status === 'refunded') {
+    return {
+      tone: 'muted',
+      text: 'The payment has been refunded. The transaction has been cancelled.',
     };
   }
 
@@ -235,6 +245,19 @@ export function ListingTransactionsPage() {
       }
     } catch {
       setError('Failed to update transaction status. Please try again.');
+    }
+  }
+
+  async function handleSellerRefund(id: number) {
+    if (!window.confirm('Issue a refund and cancel this transaction? This will return the buyer\'s payment via Stripe.')) return;
+
+    try {
+      const updated = await issueSellerRefund(id);
+      setTransactions((prev) =>
+        prev.map((transaction) => (transaction.id === updated.id ? updated : transaction)),
+      );
+    } catch {
+      setError('Failed to issue refund. Please try again.');
     }
   }
 
@@ -369,12 +392,21 @@ export function ListingTransactionsPage() {
                 {(transaction.status === 'initiated' ||
                   transaction.status === 'seller_accepted' ||
                   transaction.status === 'buyer_confirmed') && (
-                  <button
-                    style={styles.btnCancel}
-                    onClick={() => void handleStatusChange(transaction.id, 'cancelled')}
-                  >
-                    Cancel
-                  </button>
+                  payment?.status === 'paid' ? (
+                    <button
+                      style={styles.btnRefund}
+                      onClick={() => void handleSellerRefund(transaction.id)}
+                    >
+                      Issue Refund
+                    </button>
+                  ) : (
+                    <button
+                      style={styles.btnCancel}
+                      onClick={() => void handleStatusChange(transaction.id, 'cancelled')}
+                    >
+                      Cancel
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -469,6 +501,15 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#fef2f2',
     color: '#dc2626',
     border: '1px solid #fecaca',
+    borderRadius: 5,
+    fontSize: 13,
+    cursor: 'pointer',
+  },
+  btnRefund: {
+    padding: '5px 14px',
+    background: '#faf5ff',
+    color: '#7e22ce',
+    border: '1px solid #e9d5ff',
     borderRadius: 5,
     fontSize: 13,
     cursor: 'pointer',

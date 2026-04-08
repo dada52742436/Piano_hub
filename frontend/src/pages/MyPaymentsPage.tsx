@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
   paid: 'Paid',
   failed: 'Failed',
   cancelled: 'Cancelled',
+  refunded: 'Refunded',
 };
 
 function statusStyle(status: PaymentStatus): React.CSSProperties {
@@ -21,6 +22,7 @@ function statusStyle(status: PaymentStatus): React.CSSProperties {
     paid: { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' },
     failed: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
     cancelled: { background: '#f9fafb', color: '#6b7280', border: '1px solid #e5e7eb' },
+    refunded: { background: '#faf5ff', color: '#7e22ce', border: '1px solid #e9d5ff' },
   };
 
   return { ...styles.badge, ...map[status] };
@@ -45,7 +47,7 @@ export function MyPaymentsPage() {
           <Link to="/transactions/mine" style={styles.back}>Back to My Transactions</Link>
           <h2 style={styles.heading}>My Payments</h2>
           <p style={styles.subheading}>
-            Review simulated payment attempts linked to your active deal flow.
+            Review your payment attempts, including real Stripe checkout sessions and development-only simulated payments.
           </p>
         </div>
       </div>
@@ -87,6 +89,7 @@ export function MyPaymentsPage() {
                 {payment.transaction?.listing?.owner?.username
                   ? ` - seller ${payment.transaction.listing.owner.username}`
                   : ''}
+                {payment.provider ? ` - provider ${payment.provider}` : ''}
               </span>
 
               <p
@@ -100,13 +103,24 @@ export function MyPaymentsPage() {
                 }}
               >
                 {payment.status === 'pending'
-                  ? 'This payment is still pending. Once it is marked as paid, the seller can complete the transaction.'
+                  ? payment.provider === 'stripe'
+                    ? 'This Stripe checkout is still pending. Complete payment in Stripe before the seller can finalize the transaction.'
+                    : 'This payment is still pending. Once it is marked as paid, the seller can complete the transaction.'
                   : payment.status === 'paid'
                     ? 'This payment is marked as paid. The seller can now finalize the transaction.'
                     : payment.status === 'failed'
                       ? 'This payment attempt failed. Return to My Transactions if you want to create a new payment attempt.'
                       : 'This payment attempt was cancelled. You can start another one from My Transactions if the deal is still active.'}
               </p>
+
+              {payment.provider === 'stripe' && payment.status === 'pending' && payment.checkoutUrl && (
+                <a
+                  href={payment.checkoutUrl}
+                  style={styles.btnStripe}
+                >
+                  Resume Stripe Checkout
+                </a>
+              )}
 
               <span style={styles.rowDate}>
                 Updated {new Date(payment.updatedAt).toLocaleDateString('en-AU')}
@@ -137,6 +151,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     textDecoration: 'none',
     fontSize: 14,
+  },
+  btnStripe: {
+    display: 'inline-block',
+    alignSelf: 'flex-start',
+    padding: '8px 14px',
+    background: '#111827',
+    color: '#fff',
+    borderRadius: 6,
+    textDecoration: 'none',
+    fontSize: 13,
   },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   row: {

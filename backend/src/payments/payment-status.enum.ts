@@ -3,4 +3,5 @@ export enum PaymentStatus {
   paid = 'paid',
   failed = 'failed',
   cancelled = 'cancelled',
+  refunded = 'refunded',
 }

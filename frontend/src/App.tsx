@@ -17,6 +17,8 @@ import { MyListingsPage } from './pages/MyListingsPage';
 import { MyPaymentsPage } from './pages/MyPaymentsPage';
 import { MySavedListingsPage } from './pages/MySavedListingsPage';
 import { MyTransactionsPage } from './pages/MyTransactionsPage';
+import { PaymentCancelPage } from './pages/PaymentCancelPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { RegisterPage } from './pages/RegisterPage';
 
 function App() {
@@ -93,6 +95,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MyPaymentsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments/success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccessPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments/cancel"
+              element={
+                <ProtectedRoute>
+                  <PaymentCancelPage />
                 </ProtectedRoute>
               }
             />

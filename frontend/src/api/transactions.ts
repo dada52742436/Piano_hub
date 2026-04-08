@@ -66,3 +66,8 @@ export async function updateTransactionStatus(
   });
   return data;
 }
+
+export async function issueSellerRefund(id: number): Promise<Transaction> {
+  const { data } = await api.patch<Transaction>(`/transactions/${id}/refund`);
+  return data;
+}

@@ -12,6 +12,7 @@ import { InquiryStatus } from '../inquiries/inquiry-status.enum.js';
 import { ListingStatus } from '../listings/listing-status.enum.js';
 import type { CreateTransactionDto } from './dto/create-transaction.dto.js';
 import { TransactionStatus } from './transaction-status.enum.js';
+import { PaymentsService } from '../payments/payments.service.js';
 import type { Prisma, Transaction } from '../../generated/prisma/client.js';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class TransactionsService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async create(listingId: number, buyerId: number, dto: CreateTransactionDto) {
@@ -176,30 +178,38 @@ export class TransactionsService {
       );
     }
 
-    const allowedNextStatuses = this.getAllowedNextStatuses(transaction.status, {
-      isSeller,
-      isBuyer,
+    // Query once — used for both the cancel restriction (seller) and the completion check.
+    const paidPayment = await this.prismaService.prisma.payment.findFirst({
+      where: { transactionId: id, status: 'paid' },
     });
 
+    const allowedNextStatuses = this.getAllowedNextStatuses(
+      transaction.status,
+      { isSeller, isBuyer },
+      !!paidPayment,
+    );
+
     if (!allowedNextStatuses.includes(status)) {
+      const sellerBlockedByPayment =
+        isSeller &&
+        status === TransactionStatus.cancelled &&
+        !!paidPayment;
+
+      if (sellerBlockedByPayment) {
+        throw new BadRequestException(
+          'The buyer has already paid. Use the "Issue Refund" action to cancel and refund the payment.',
+        );
+      }
+
       throw new BadRequestException(
         `You cannot move a transaction from '${transaction.status}' to '${status}'`,
       );
     }
 
-    if (status === TransactionStatus.completed) {
-      const paidPayment = await this.prismaService.prisma.payment.findFirst({
-        where: {
-          transactionId: id,
-          status: 'paid',
-        },
-      });
-
-      if (!paidPayment) {
-        throw new BadRequestException(
-          'This transaction cannot be completed until a payment is marked as paid',
-        );
-      }
+    if (status === TransactionStatus.completed && !paidPayment) {
+      throw new BadRequestException(
+        'This transaction cannot be completed until a payment is marked as paid',
+      );
     }
 
     const updatedTransaction = await this.prismaService.prisma.transaction.update({
@@ -233,7 +243,85 @@ export class TransactionsService {
       updatedTransaction.listing.status = ListingStatus.sold;
     }
 
+    if (status === TransactionStatus.cancelled) {
+      // Buyer cancelled — attempt to refund any paid Stripe payment.
+      // Seller cannot reach this branch after payment (blocked above by getAllowedNextStatuses).
+      await this.paymentsService.refundPaidStripePayment(id);
+    }
+
     return updatedTransaction;
+  }
+
+  /**
+   * Seller-initiated refund after the buyer has already paid.
+   * Refunds the Stripe payment then cancels the transaction.
+   * Distinct from the normal cancel path, which is blocked for sellers post-payment.
+   */
+  async sellerRefund(id: number, sellerId: number) {
+    const transaction = await this.prismaService.prisma.transaction.findUnique({
+      where: { id },
+      include: {
+        listing: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            status: true,
+            location: true,
+            ownerId: true,
+            owner: { select: { id: true, username: true } },
+          },
+        },
+        buyer: { select: { id: true, username: true } },
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction #${id} not found`);
+    }
+
+    if (transaction.listing.ownerId !== sellerId) {
+      throw new ForbiddenException('Only the seller can issue a refund');
+    }
+
+    if (
+      transaction.status === TransactionStatus.completed ||
+      transaction.status === TransactionStatus.cancelled
+    ) {
+      throw new BadRequestException(
+        `Transaction is already '${transaction.status}' and cannot be changed`,
+      );
+    }
+
+    const paidPayment = await this.prismaService.prisma.payment.findFirst({
+      where: { transactionId: id, status: 'paid' },
+    });
+
+    if (!paidPayment) {
+      throw new BadRequestException(
+        'No paid payment found. Use the regular cancel action instead.',
+      );
+    }
+
+    await this.paymentsService.refundPaidStripePayment(id);
+
+    return this.prismaService.prisma.transaction.update({
+      where: { id },
+      data: { status: TransactionStatus.cancelled, expiresAt: null },
+      include: {
+        listing: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            status: true,
+            location: true,
+            owner: { select: { id: true, username: true } },
+          },
+        },
+        buyer: { select: { id: true, username: true } },
+      },
+    });
   }
 
   private buildStatusUpdateData(status: TransactionStatus): Prisma.TransactionUpdateInput {
@@ -336,20 +424,25 @@ export class TransactionsService {
   private getAllowedNextStatuses(
     currentStatus: string,
     actor: { isSeller: boolean; isBuyer: boolean },
+    hasPaidPayment = false,
   ): TransactionStatus[] {
     const transitions: TransactionStatus[] = [];
 
     if (actor.isSeller) {
       if (currentStatus === TransactionStatus.initiated) {
-        transitions.push(TransactionStatus.sellerAccepted, TransactionStatus.cancelled);
+        transitions.push(TransactionStatus.sellerAccepted);
+        // Seller can freely cancel before any payment is made.
+        if (!hasPaidPayment) transitions.push(TransactionStatus.cancelled);
       }
 
       if (currentStatus === TransactionStatus.sellerAccepted) {
-        transitions.push(TransactionStatus.cancelled);
+        if (!hasPaidPayment) transitions.push(TransactionStatus.cancelled);
       }
 
       if (currentStatus === TransactionStatus.buyerConfirmed) {
-        transitions.push(TransactionStatus.completed, TransactionStatus.cancelled);
+        transitions.push(TransactionStatus.completed);
+        // After payment, seller must use the dedicated refund endpoint instead.
+        if (!hasPaidPayment) transitions.push(TransactionStatus.cancelled);
       }
     }
 

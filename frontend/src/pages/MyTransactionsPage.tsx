@@ -1,7 +1,9 @@
+import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   createPayment,
+  createStripeCheckoutSession,
   getMyPayments,
   simulatePaymentStatus,
   type Payment,
@@ -33,6 +35,7 @@ const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   paid: 'Payment Paid',
   failed: 'Payment Failed',
   cancelled: 'Payment Cancelled',
+  refunded: 'Payment Refunded',
 };
 
 function statusStyle(status: TransactionStatus): React.CSSProperties {
@@ -53,6 +56,7 @@ function paymentStatusStyle(status: PaymentStatus): React.CSSProperties {
     paid: { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' },
     failed: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
     cancelled: { background: '#f9fafb', color: '#6b7280', border: '1px solid #e5e7eb' },
+    refunded: { background: '#faf5ff', color: '#7e22ce', border: '1px solid #e9d5ff' },
   };
 
   return { ...styles.badge, ...map[status] };
@@ -84,7 +88,16 @@ function formatRemainingTime(expiresAt: string, currentTime: number): string {
 function buildTransactionNotice(
   transaction: Transaction,
   currentTime: number,
+  payment?: Payment,
 ): { tone: 'neutral' | 'warning' | 'muted'; text: string } | null {
+  // Payment is done but buyer hasn't confirmed yet — prompt them to confirm so the seller can complete.
+  if (transaction.status === 'seller_accepted' && payment?.status === 'paid') {
+    return {
+      tone: 'warning',
+      text: 'Your payment is confirmed. Click Confirm below to lock in the deal so the seller can complete the transaction.',
+    };
+  }
+
   if (transaction.status === 'seller_accepted' && transaction.expiresAt) {
     return {
       tone: 'warning',
@@ -138,6 +151,13 @@ function buildPaymentNotice(
   }
 
   if (payment.status === 'pending') {
+    if (payment.provider === 'stripe') {
+      return {
+        tone: 'warning',
+        text: 'Stripe checkout is still pending. Complete payment in Stripe before the seller can finalize this deal.',
+      };
+    }
+
     return {
       tone: 'warning',
       text: 'This payment is still pending. Mark it as paid to unlock final completion on the seller side.',
@@ -155,6 +175,13 @@ function buildPaymentNotice(
     return {
       tone: 'muted',
       text: 'This payment attempt failed. You can create a new payment attempt for the same transaction.',
+    };
+  }
+
+  if (payment.status === 'refunded') {
+    return {
+      tone: 'muted',
+      text: 'Your payment has been refunded by Stripe. The funds should appear in your account within 5–10 business days.',
     };
   }
 
@@ -207,8 +234,11 @@ export function MyTransactionsPage() {
       setTransactions((prev) =>
         prev.map((transaction) => (transaction.id === updated.id ? updated : transaction)),
       );
-    } catch {
-      setError('Failed to update transaction status. Please try again.');
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string })?.message
+        : undefined;
+      setError(message ?? 'Failed to update transaction status. Please try again.');
     }
   }
 
@@ -222,8 +252,35 @@ export function MyTransactionsPage() {
         ...prev,
         [transaction.id]: payment,
       }));
-    } catch {
-      setError('Failed to create a payment attempt. Please try again.');
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string })?.message
+        : undefined;
+      setError(message ?? 'Failed to create a payment attempt. Please try again.');
+    }
+  }
+
+  async function handleStripeCheckout(transactionId: number) {
+    try {
+      const payment = await createStripeCheckoutSession(transactionId);
+
+      setPaymentsByTransaction((prev) => ({
+        ...prev,
+        [transactionId]: payment,
+      }));
+
+      if (!payment.checkoutUrl) {
+        setError('Stripe checkout URL was not returned. Please try again.');
+        return;
+      }
+
+      window.location.assign(payment.checkoutUrl);
+    } catch (err) {
+      // Extract the actual backend error message so we can see what went wrong.
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string })?.message
+        : undefined;
+      setError(message ?? 'Failed to start Stripe checkout. Please try again.');
     }
   }
 
@@ -274,8 +331,8 @@ export function MyTransactionsPage() {
 
       <div style={styles.list}>
         {transactions.map((transaction) => {
-          const notice = buildTransactionNotice(transaction, currentTime);
           const payment = paymentsByTransaction[transaction.id];
+          const notice = buildTransactionNotice(transaction, currentTime, payment);
           const paymentNotice = buildPaymentNotice(payment);
 
           return (
@@ -363,15 +420,43 @@ export function MyTransactionsPage() {
                   payment.status === 'cancelled') &&
                   (transaction.status === 'seller_accepted' ||
                     transaction.status === 'buyer_confirmed') && (
-                    <button
-                      style={styles.btnPay}
-                      onClick={() => void handleCreatePayment(transaction)}
-                    >
-                      {payment ? 'Create New Payment' : 'Create Payment'}
-                    </button>
+                    <>
+                      <button
+                        style={styles.btnStripe}
+                        onClick={() => void handleStripeCheckout(transaction.id)}
+                      >
+                        {payment ? 'Pay with Stripe Again' : 'Pay with Stripe'}
+                      </button>
+                      <button
+                        style={styles.btnPay}
+                        onClick={() => void handleCreatePayment(transaction)}
+                      >
+                        {payment ? 'Create Simulated Payment' : 'Dev: Simulate Payment'}
+                      </button>
+                    </>
                   )}
 
-                {payment?.status === 'pending' && (
+                {payment?.provider === 'stripe' &&
+                  payment.status === 'pending' &&
+                  payment.checkoutUrl && (
+                    <>
+                      <button
+                        style={styles.btnStripe}
+                        onClick={() => window.location.assign(payment.checkoutUrl as string)}
+                      >
+                        Resume Stripe Checkout
+                      </button>
+                      {/* Allow cancelling a stale/expired Stripe session so a new one can be created. */}
+                      <button
+                        style={styles.btnCancel}
+                        onClick={() => void handleSimulatePayment(payment.id, transaction.id, 'cancelled')}
+                      >
+                        Cancel expired session
+                      </button>
+                    </>
+                  )}
+
+                {payment?.provider !== 'stripe' && payment?.status === 'pending' && (
                   <>
                     <button
                       style={styles.btnPaySuccess}
@@ -496,6 +581,15 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f5f3ff',
     color: '#7c3aed',
     border: '1px solid #ddd6fe',
+    borderRadius: 5,
+    fontSize: 13,
+    cursor: 'pointer',
+  },
+  btnStripe: {
+    padding: '5px 14px',
+    background: '#111827',
+    color: '#fff',
+    border: '1px solid #111827',
     borderRadius: 5,
     fontSize: 13,
     cursor: 'pointer',

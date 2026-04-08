@@ -1,504 +1,298 @@
-﻿# Project Context — Piano Listing Platform (Melbourne)
+# Project Context — PianoHub
 
-> 用于在新对话中恢复上下文。当前状态：**Phase 4 完成 — 单元测试（27 tests）、E2E baseline（36 tests）、Swagger UI、Seed 演示数据、Docker 容器化、组件抽离、图片上传、搜索/筛选/分页全部就绪。**
-
----
-
-## 项目概述
-
-在 `x:\my-project150326` 下搭建了一个墨尔本二手钢琴交易平台，包含：
-
-- **Backend**: NestJS 11 (strict TypeScript) + Prisma 7 + PostgreSQL + JWT
-- **Frontend**: React 19 + Vite 8 + TypeScript + React Router v7 + Axios
-- **背景**: 墨尔本二手钢琴平台（货币 AUD $）
-- **功能**: 用户注册、登录、bcrypt 密码存储、JWT 认证、Listing CRUD（含所有者权限校验）
+> 用于在 Claude / Codex 新对话中快速恢复项目上下文。  
+> 当前状态：**auth hardening、listing status、saved listings、inquiries、transactions、simulated payments、Stripe real payment step 1/2、dashboard、URL-synced listings search 已完成。**
 
 ---
 
-## 目录结构
+## 1. 项目概述
 
-```
-x:\my-project150326\
-├── .gitignore
-├── README.md
-├── README_DEV.md               ← 开发者文档（Phase 4 重写）
-├── project_context.md
-├── docker-compose.yml          ← Phase 4 新增：postgres + backend + frontend 三服务
-├── backend\
-│   ├── Dockerfile              ← Phase 4 新增：多阶段构建
-│   ├── package.json            ← 含 "type": "module"（关键！）
-│   ├── tsconfig.json
-│   ├── nest-cli.json           ← Swagger CLI 插件已移除（ESM 不兼容），只保留 assets
-│   ├── prisma.config.ts        ← Prisma 7 配置：datasource.url + migrations.seed
-│   ├── .env                    ← DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN
-│   ├── .env.example
-│   ├── prisma\
-│   │   ├── schema.prisma       ← User + Listing + Booking + ListingImage 模型
-│   │   ├── seed.ts             ← Phase 4 新增：演示数据（alice/bob + 7 listings）
-│   │   └── migrations\         ← init + add_listing_model + add_condition_enum + bookings + images
-│   ├── generated\
-│   │   └── prisma\
-│   │       └── package.json    ← {"type":"module"}（关键！git-ignored）
-│   └── src\
-│       ├── main.ts             ← 端口 3001, CORS, ValidationPipe, Swagger UI /docs
-│       ├── app.module.ts       ← ConfigModule, PrismaModule, UsersModule, AuthModule, ListingsModule, BookingsModule, ServeStaticModule
-│       ├── prisma\
-│       │   ├── prisma.service.ts  ← 组合模式（非继承），driver adapter
-│       │   └── prisma.module.ts   ← @Global()
-│       ├── users\
-│       │   ├── users.service.ts
-│       │   └── users.module.ts
-│       ├── auth\
-│       │   ├── dto\
-│       │   │   ├── register.dto.ts
-│       │   │   └── login.dto.ts
-│       │   ├── auth.service.ts
-│       │   ├── auth.controller.ts
-│       │   ├── auth.module.ts
-│       │   ├── jwt.strategy.ts
-│       │   └── jwt-auth.guard.ts
-│       ├── listings\
-│       │   ├── dto\
-│       │   │   ├── create-listing.dto.ts   ← @IsEnum(Condition)
-│       │   │   ├── update-listing.dto.ts
-│       │   │   └── get-listings-query.dto.ts  ← Phase 3：search/condition/brand/price/page/limit
-│       │   ├── images\                    ← Phase 3 新增：图片上传子模块
-│       │   │   ├── images.service.ts      ← Multer diskStorage + 所有权校验 + 5 张限制
-│       │   │   ├── images.controller.ts
-│       │   │   └── images.module.ts
-│       │   ├── listings.service.ts        ← Phase 3：searchFilter + pagination + Promise.all
-│       │   ├── listings.controller.ts
-│       │   └── listings.module.ts
-│       ├── bookings\                       ← Phase 2 新增
-│       │   ├── dto\
-│       │   │   ├── create-booking.dto.ts
-│       │   │   └── update-booking-status.dto.ts
-│       │   ├── bookings.service.ts
-│       │   ├── bookings.controller.ts
-│       │   └── bookings.module.ts
-│       └── protected\
-│           └── protected.controller.ts
-└── frontend\
-    ├── Dockerfile              ← Phase 4 新增：nginx 多阶段构建
-    ├── nginx.conf              ← SPA 路由回退 + /api + /uploads 反向代理
-    ├── package.json
-    ├── vite.config.ts          ← port:3000, proxy /api + /uploads → localhost:3001
-    └── src\
-        ├── main.tsx
-        ├── App.tsx             ← 所有路由
-        ├── constants\
-        │   └── conditions.ts   ← CONDITIONS 数组 + CONDITION_LABELS map（单一数据源）
-        ├── styles\
-        │   └── shared.ts       ← Phase 4 新增：sharedInputStyle, sharedBackLinkStyle
-        ├── api\
-        │   ├── auth.ts         ← axios 实例 + 拦截器 + auth API
-        │   ├── listings.ts     ← listings + 图片 API + 401 interceptor
-        │   └── bookings.ts     ← bookings API + 类型定义
-        ├── context\
-        │   └── AuthContext.tsx ← 全局 auth 状态 + localStorage
-        ├── components\
-        │   ├── ProtectedRoute.tsx
-        │   └── ui\
-        │       └── Field.tsx   ← Phase 4 新增：通用表单字段包装组件
-        └── pages\
-            ├── LoginPage.tsx
-            ├── RegisterPage.tsx
-            ├── DashboardPage.tsx
-            ├── ListingsPage.tsx          ← Phase 3：搜索/筛选/分页；两套 state（draft/committed）
-            ├── ListingDetailPage.tsx     ← Phase 3：图片展示/上传/删除
-            ├── CreateListingPage.tsx     ← Phase 4：改用 Field + sharedInputStyle
-            ├── MyListingsPage.tsx        ← Phase 2：Bookings 按钮
-            ├── EditListingPage.tsx       ← Phase 4：改用 Field + sharedInputStyle
-            ├── MyBookingsPage.tsx        ← Phase 2：买家预约列表（可取消 pending）
-            └── ListingBookingsPage.tsx  ← Phase 2：卖家管理预约（可接受/拒绝）
-```
+项目路径：
+
+- `x:\my-project150326`
+
+PianoHub 是一个面向墨尔本二手钢琴交易场景的全栈 marketplace 项目。
+
+当前技术栈：
+
+- Backend: NestJS 11 + TypeScript strict + Prisma 7 + PostgreSQL + JWT + bcrypt
+- Frontend: React 19 + Vite 8 + TypeScript + React Router v7 + Axios
+- Auth: `httpOnly cookie session`
+- Payment:
+  - 本地开发保留 simulated payment flow
+  - 已接入 Stripe Checkout 基础层和 webhook 基础处理
 
 ---
 
-## 技术栈与版本
+## 2. 当前模块完成度
 
-| 技术 | 版本 | 备注 |
-|------|------|------|
-| NestJS | 11 | strict 模式 |
-| Prisma | 7.5.0 | 破坏性变更：需要 driver adapter，url 在 prisma.config.ts |
-| @prisma/adapter-pg | 7.x | Prisma 7 必须 |
-| PostgreSQL | 本地 5432 | 数据库名：auth_demo |
-| @nestjs/jwt | latest | JWT 签发/验证 |
-| passport-jwt | latest | Bearer token 提取 |
-| bcrypt | latest | saltRounds=10 |
-| class-validator | latest | DTO 字段校验 |
-| React | 19 | |
-| Vite | 8 | |
-| react-router-dom | 7 | |
-| axios | 1 | |
+### 已完成的大模块
 
----
+- Auth
+  - register / login / logout
+  - cookie session
+  - protected profile
+- Listings
+  - create / read / update / delete
+  - search / filter / pagination
+  - URL state sync
+  - public browse + owner flows
+- Listing status
+  - `active / sold / archived`
+  - public listings only show `active`
+- Listing images
+  - upload / delete
+- Bookings
+  - buyer request
+  - seller accept / reject
+  - buyer cancel
+- Saved listings
+- Inquiries
+- Transactions
+  - buyer initiate
+  - seller accept
+  - buyer confirm
+  - seller complete / cancel
+  - buyer cancel
+  - expiry / release rules
+  - complete -> listing sold
+  - complete -> close competing transactions / bookings / inquiries
+  - terminal transaction 后允许同 buyer 针对同 listing 重新发起新 transaction
+- Payments
+  - simulated payment flow
+  - `paid` is required before transaction can complete
+  - Stripe Checkout Session backend
+  - Stripe webhook backend
+  - frontend `Pay with Stripe` entry
+  - success / cancel pages
+- Dashboard
+  - account stats
+  - needs attention
+  - seller workspace
+  - buyer workspace
+  - recent activity
+  - payment stats
+- Layout
+  - shared navbar
+  - unified page language
 
-## 关键技术细节（踩坑记录）
+### 当前仍未完成或只完成基础层的部分
 
-### 1. Prisma 7 — url 不能放在 schema.prisma
-
-**问题**: `The datasource property 'url' is no longer supported in schema files`
-
-**解决**: `url` 必须放在 `prisma.config.ts` 的 `datasource.url`，schema 里只留 `provider`：
-
-```prisma
-// schema.prisma — 正确
-datasource db {
-  provider = "postgresql"
-}
-```
-
-```typescript
-// prisma.config.ts — 正确
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  datasource: { url: process.env["DATABASE_URL"] },
-});
-```
-
-### 2. Prisma 7 + Node.js 22 ESM/CJS 冲突（已解决）
-
-**解决方案**（三处修改）:
-1. `backend/package.json` 添加 `"type": "module"`
-2. 创建 `backend/generated/prisma/package.json`，内容为 `{"type": "module"}`
-3. 所有 import 使用 `.js` 扩展名
-
-### 3. Prisma 7 使用组合模式（非继承）
-
-```typescript
-// prisma.service.ts
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../../generated/prisma/client.js';
-
-export class PrismaService {
-  readonly prisma: PrismaClient;
-  constructor() {
-    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-    this.prisma = new PrismaClient({ adapter });
-  }
-}
-// 用法：this.prismaService.prisma.listing.findMany(...)
-```
-
-### 4. Prisma 7 schema.prisma generator 配置
-
-```prisma
-generator client {
-  provider     = "prisma-client"
-  output       = "../generated/prisma"
-  moduleFormat = "esm"
-}
-```
-
-### 5. JWT `expiresIn` TypeScript 类型问题
-
-```typescript
-expiresIn: process.env.JWT_EXPIRES_IN as `${number}${'s'|'m'|'h'|'d'}`,
-```
+- Stripe end-to-end local verification still depends on correct env + Stripe CLI
+- README / docs刚刚需要同步到最新 Stripe 阶段
+- provider-specific deployment guide 未完成
+- Stripe Connect / payout 未开始
 
 ---
 
-## 数据库 Schema
+## 3. 当前关键业务边界
 
-```prisma
-enum Condition {
-  new
-  like_new
-  good
-  fair
-  poor
-}
+### Inquiry / Booking / Transaction 的区别
 
-model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  username  String
-  password  String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  listings  Listing[]
-  bookings  Booking[] @relation("BookingBuyer")   // Phase 2
-  @@map("users")
-}
+- Inquiry = 轻量联系 / 初步咨询
+- Booking = 预约 / 跟进
+- Transaction = 正式成交流程
 
-model Listing {
-  id          Int            @id @default(autoincrement())
-  title       String
-  description String
-  price       Float          // AUD
-  brand       String?
-  condition   Condition
-  location    String?
-  ownerId     Int
-  owner       User           @relation(fields: [ownerId], references: [id])
-  bookings    Booking[]                            // Phase 2
-  images      ListingImage[]                       // Phase 3 新增
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  @@map("listings")
-}
+不要把 booking 和 transaction 混用。
 
-// Phase 2 — 新增
-enum BookingStatus {
-  pending
-  accepted
-  rejected
-  cancelled
-}
+### Listing status
 
-model Booking {
-  id        Int           @id @default(autoincrement())
-  listingId Int
-  listing   Listing       @relation(fields: [listingId], references: [id])
-  buyerId   Int
-  buyer     User          @relation("BookingBuyer", fields: [buyerId], references: [id])
-  status    BookingStatus @default(pending)
-  message   String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  @@unique([listingId, buyerId])
-  @@map("bookings")
-}
+- public `GET /listings` 只返回 `active`
+- `sold / archived` listing 不接受新的 booking / inquiry / transaction
+- `/listings/mine` 仍显示 owner 的全部 listings
 
-// Phase 3 — 新增
-model ListingImage {
-  id        Int      @id @default(autoincrement())
-  listingId Int
-  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  url       String   // 公开路径，如 /uploads/listing-3-1234567890.jpg
-  order     Int      @default(0)  // 展示顺序
-  createdAt DateTime @default(now())
-  @@map("listing_images")
-}
-```
+### Transactions
 
-- **数据库名**: `pianohub`（Docker 及新建项目）/ 旧本地实例可能仍为 `auth_demo`
-- **用户**: `postgres` / **端口**: `5432`
+- 同一 buyer 对同一 listing 同时只能有一条活跃 transaction
+- 若旧 transaction 已是 `cancelled / completed`，允许重新发起
+- seller accepted 后会写：
+  - `sellerAcceptedAt`
+  - `expiresAt`
+- buyer 超时不推进时，transaction 自动释放为 `cancelled`
+- completed 之前必须已有 `paid` payment
+- 某 transaction completed 后：
+  - listing -> `sold`
+  - competing transactions -> `cancelled`
+  - competing bookings -> `rejected`
+  - open inquiries -> `closed`
+
+### Payments
+
+当前有两层 payment：
+
+1. simulated payment
+2. Stripe real payment baseline
+
+当前规则：
+
+- payment 只能在 transaction 已到：
+  - `seller_accepted`
+  - 或 `buyer_confirmed`
+  时创建
+- `paid` payment 是 transaction `completed` 的前置条件
+- frontend 仍保留 simulate 按钮作为开发 fallback
 
 ---
 
-## API 端点
+## 4. 当前 Stripe 状态
 
-### Auth
-| 方法 | 路径 | 描述 | 认证 |
-|------|------|------|------|
-| POST | /auth/register | 注册，返回 JWT + user | 无 |
-| POST | /auth/login | 登录，返回 JWT + user | 无 |
-| GET  | /protected/profile | 当前用户信息 | Bearer Token |
+### 已完成
 
-### Listings
-| 方法 | 路径 | 描述 | 认证 |
-|------|------|------|------|
-| GET    | /listings       | 搜索/筛选/分页（query: search/condition/brand/minPrice/maxPrice/page/limit） | 无 |
-| GET    | /listings/mine  | 当前用户的 listings | JWT |
-| GET    | /listings/:id   | 单个 listing 详情（含 images ordered by order ASC） | 无 |
-| POST   | /listings       | 创建 listing | JWT |
-| PATCH  | /listings/:id   | 编辑（仅本人，否则 403） | JWT |
-| DELETE | /listings/:id   | 删除（仅本人，否则 403） | JWT |
+Backend:
 
-### Listing Images（Phase 3）
-| 方法 | 路径 | 描述 | 认证 |
-|------|------|------|------|
-| POST   | /listings/:id/images           | 上传图片（multipart, field=file, max 5张, 5MB） | JWT |
-| DELETE | /listings/:id/images/:imageId  | 删除图片（仅 owner，删磁盘文件） | JWT |
+- `POST /transactions/:transactionId/payments/checkout-session`
+- `POST /payments/webhook`
+- payment table 已新增：
+  - `providerCheckoutSessionId`
+  - `checkoutUrl`
+- Stripe webhook 处理：
+  - `checkout.session.completed`
+  - `checkout.session.expired`
+  - `payment_intent.payment_failed`
 
-### Bookings（Phase 2）
-| 方法 | 路径 | 描述 | 认证 | 权限 |
-|------|------|------|------|------|
-| POST  | /listings/:listingId/bookings | 提交预约 | JWT | 买家（非 listing 所有者）|
-| GET   | /bookings/mine                | 我的所有预约 | JWT | 本人 |
-| GET   | /listings/:listingId/bookings | 某 listing 的所有预约 | JWT | 卖家（listing 所有者）|
-| PATCH | /bookings/:id/status          | 更新预约状态 | JWT | 卖家（accepted/rejected）或买家（cancelled）|
+Frontend:
 
-**状态机**: `pending` → { 卖家: `accepted` / `rejected`；买家: `cancelled` }。只有 pending 状态可被修改。  
-**约束**: 同一 (listingId, buyerId) 只能有一条预约（DB `@@unique`）。
+- `My Transactions` 里新增：
+  - `Pay with Stripe`
+  - `Resume Stripe Checkout`
+- `My Payments` 可显示 provider，并恢复 pending Stripe checkout
+- 新增：
+  - `/payments/success`
+  - `/payments/cancel`
 
----
+### 当前最常见问题
 
-## 前端路由
+真实 Stripe checkout 失败时，优先排查：
 
-| 路径 | 组件 | 保护 |
-|------|------|------|
-| `/` | → redirect `/listings` | — |
-| `/listings` | `ListingsPage` | 公开 |
-| `/listings/:id` | `ListingDetailPage` | 公开 |
-| `/listings/new` | `CreateListingPage` | ProtectedRoute |
-| `/listings/mine` | `MyListingsPage` | ProtectedRoute |
-| `/listings/:id/edit` | `EditListingPage` | ProtectedRoute |
-| `/login` | `LoginPage` | 公开 |
-| `/register` | `RegisterPage` | 公开 |
-| `/dashboard` | `DashboardPage` | ProtectedRoute |
-| `/bookings/mine` | `MyBookingsPage` | ProtectedRoute |
-| `/listings/:id/bookings` | `ListingBookingsPage` | ProtectedRoute |
+1. `backend/.env` 是否已配置：
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_SUCCESS_URL`
+   - `STRIPE_CANCEL_URL`
+   - `STRIPE_CURRENCY`
+2. 后端是否已重启
+3. `stripe listen --forward-to http://localhost:3001/payments/webhook` 是否正在运行
+4. `STRIPE_WEBHOOK_SECRET` 是否和当前 CLI 输出一致
+5. transaction 状态是否确实为：
+   - `seller_accepted`
+   - 或 `buyer_confirmed`
 
-**登录/注册成功后跳转**: `/listings`（非 `/dashboard`）
+### 当前真实状态
+
+最近一次检查中，用户本地 `backend/.env` 里：
+
+- `STRIPE_SECRET_KEY` 已帮用户写入
+- `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` / `STRIPE_CURRENCY` 已写入
+- `STRIPE_WEBHOOK_SECRET` 仍需用户从 `stripe listen` 输出中手动填入
 
 ---
 
-## 环境变量 (`backend/.env`)
+## 5. 当前关键文件
 
-```env
-DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/auth_demo"
-JWT_SECRET="your-super-secret-jwt-key-change-in-production"
-JWT_EXPIRES_IN="7d"
-```
+### 后端
+
+- [backend/src/auth/auth.controller.ts](/x:/my-project150326/backend/src/auth/auth.controller.ts)
+- [backend/src/auth/jwt.strategy.ts](/x:/my-project150326/backend/src/auth/jwt.strategy.ts)
+- [backend/src/listings/listings.service.ts](/x:/my-project150326/backend/src/listings/listings.service.ts)
+- [backend/src/bookings/bookings.service.ts](/x:/my-project150326/backend/src/bookings/bookings.service.ts)
+- [backend/src/inquiries/inquiries.service.ts](/x:/my-project150326/backend/src/inquiries/inquiries.service.ts)
+- [backend/src/transactions/transactions.service.ts](/x:/my-project150326/backend/src/transactions/transactions.service.ts)
+- [backend/src/payments/payments.service.ts](/x:/my-project150326/backend/src/payments/payments.service.ts)
+- [backend/src/payments/payments.controller.ts](/x:/my-project150326/backend/src/payments/payments.controller.ts)
+- [backend/src/payments/stripe.service.ts](/x:/my-project150326/backend/src/payments/stripe.service.ts)
+- [backend/test/app.e2e-spec.ts](/x:/my-project150326/backend/test/app.e2e-spec.ts)
+
+### 前端
+
+- [frontend/src/context/AuthContext.tsx](/x:/my-project150326/frontend/src/context/AuthContext.tsx)
+- [frontend/src/api/client.ts](/x:/my-project150326/frontend/src/api/client.ts)
+- [frontend/src/api/payments.ts](/x:/my-project150326/frontend/src/api/payments.ts)
+- [frontend/src/pages/MyTransactionsPage.tsx](/x:/my-project150326/frontend/src/pages/MyTransactionsPage.tsx)
+- [frontend/src/pages/MyPaymentsPage.tsx](/x:/my-project150326/frontend/src/pages/MyPaymentsPage.tsx)
+- [frontend/src/pages/ListingTransactionsPage.tsx](/x:/my-project150326/frontend/src/pages/ListingTransactionsPage.tsx)
+- [frontend/src/pages/PaymentSuccessPage.tsx](/x:/my-project150326/frontend/src/pages/PaymentSuccessPage.tsx)
+- [frontend/src/pages/PaymentCancelPage.tsx](/x:/my-project150326/frontend/src/pages/PaymentCancelPage.tsx)
+- [frontend/src/pages/DashboardPage.tsx](/x:/my-project150326/frontend/src/pages/DashboardPage.tsx)
+- [frontend/src/pages/ListingsPage.tsx](/x:/my-project150326/frontend/src/pages/ListingsPage.tsx)
 
 ---
 
-## 启动命令
+## 6. 当前测试基线
 
-### 本地启动
-```powershell
-# 终端 1 — 后端 (http://localhost:3001, Swagger: http://localhost:3001/docs)
-Set-Location x:\my-project150326\backend
-npm run start:dev
+### Backend unit tests
 
-# 终端 2 — 前端 (http://localhost:3000)
-Set-Location x:\my-project150326\frontend
-npm run dev
-
-# 首次启动前（建表 + 演示数据）
-cd x:\my-project150326\backend
-npx prisma migrate dev
-npx prisma db seed
-```
-
-### Docker 启动（Phase 4）
 ```bash
-# 从项目根目录
-docker compose up --build
-
-# 首次运行后插入演示数据（可选）
-docker compose exec backend npx prisma db seed
+cd backend
+npx jest --runInBand
 ```
 
-> **演示账号**（密码均为 `demo123!`）: `alice@demo.com`（4 listings）/ `bob@demo.com`（3 listings）
+当前总数：
+
+- `74`
+
+### Backend e2e
+
+```bash
+cd backend
+npm run test:e2e
+```
+
+当前总数：
+
+- `73`
+
+已覆盖：
+
+- auth / cookie session
+- protected profile
+- listings
+- listing status
+- bookings
+- listing images
+- saved listings
+- inquiries
+- transactions
+- payments（模拟主链路）
+
+### Frontend typecheck
+
+```bash
+cd frontend
+.\node_modules\.bin\tsc -b --pretty false
+```
+
+最近一次在真实 payment step 2 后已通过。
 
 ---
 
-## 下一步方向（未实现）
+## 7. 已知上下文与协作偏好
 
-- 全局 Navbar 导航栏
-- 买家联系卖家（消息系统 / WebSocket）
-- Listing 状态字段（active / sold / archived）
-- 收藏 / 关注 listing
-- 后续新业务模块的增量 E2E 扩展
-- Tailwind CSS 迁移
+用户偏好：
 
----
+- 中文沟通
+- 按 step 推进，不喜欢无边界自动扩展
+- 大模块默认 backend-first
+- 每做完一个 step 要给出清楚的：
+  - current goal
+  - files to add/modify
+  - responsibilities
+  - code summary
+  - run / test / issues / completed
 
-## ⚠️ 关键 Bug 修复记录（Phase 4 本会话）
+文档约定：
 
-### 1. seed.ts — Condition enum 值错误
-- **文件**: `backend/prisma/seed.ts`
-- **问题**: `condition: 'excellent'` → TypeScript 编译报错，`excellent` 不在 Condition enum 中
-- **修复**: 改为 `condition: 'like_new'`（影响 Yamaha U1 和 Bösendorfer 200 两条记录）
-- **有效 enum 值**: `new | like_new | good | fair | poor`
-
-### 2. prisma.config.ts — seed 配置位置
-- **问题**: Prisma 7 不从 `package.json` 的 `"prisma": { "seed": "..." }` 读取，而从 `prisma.config.ts` 的 `migrations.seed` 读取
-- **修复**: 在 `prisma.config.ts` 的 `migrations` 对象下添加 `seed: "npx tsx prisma/seed.ts"`
-- **当前状态**: ✅ 已修复，`npx prisma db seed` 正常工作
-
-### 3. nest-cli.json — 移除 @nestjs/swagger CLI 插件
-- **问题**: `@nestjs/swagger` CLI 插件在编译时向 DTO 类注入含 `require('class-validator')` 的 `_OPENAPI_METADATA_FACTORY` 方法；ESM 运行时没有 `require`，导致 `ReferenceError: require is not defined` 在 NestJS 启动时崩溃
-- **修复**: 从 `nest-cli.json` 完全删除 `plugins` 块
-- **影响**: Swagger UI (`/docs`) 仍正常工作；但 DTO 字段不会自动生成 `@ApiProperty`（需要手动添加）
-- **当前状态**: ✅ 已移除，后端启动正常
-
-### 4. E2E 测试状态
-- `backend/test/app.e2e-spec.ts` 已从 NestJS 默认脚手架测试扩展为当前阶段的综合 E2E 基线
-- `npm run test:e2e` 当前可稳定运行，覆盖 **36 个测试**
-- 已覆盖模块：`auth`、`protected profile`、`listings public + owner flows`、`bookings lifecycle + ownership`、`listing images`
-- 单元测试当前为 **27 个测试，4 个 spec 文件**
+- `README_DEV.md` 是当前最可信的中文开发快照
+- `project_context.md` 是为后续 AI 接手准备的上下文恢复文件
 
 ---
 
-## Phase 4 变更记录（2026-03-24）
+## 8. 建议的下一步方向
 
-### 后端
-- **`nest-cli.json`**：移除 `@nestjs/swagger` plugin（ESM 不兼容，见上方 Bug 修复 #3）
-- **`prisma.config.ts`**：新增 `migrations.seed: "npx tsx prisma/seed.ts"`（Prisma 7 seed 配置位置）
-- **`prisma/seed.ts`**（新文件）：演示数据脚本，创建 alice/bob 账号 + 7 条 listing；使用 `upsert` + count 检查保证幂等性；修复 `condition: 'excellent'` → `'like_new'`
-- **`src/auth/auth.service.spec.ts`**（新文件）：6 个单元测试（注册/登录全流程）
-- **`src/listings/listings.service.spec.ts`**（新文件）：10 个单元测试（CRUD + 403 + 分页）
-- **`src/listings/images/images.service.spec.ts`**（新文件）：10 个单元测试（图片上传/删除）
-- **`src/app.controller.spec.ts`**：1 个基础单元测试
-- **`test/app.e2e-spec.ts`**：36 个 E2E 测试，覆盖 auth、protected、listings、bookings、listing images
-- **Jest 配置**（`package.json`）：`ts-jest` 覆盖 `module: "commonjs"` + `moduleNameMapper` `.js` → `.ts`，解决 ESM/CJS 冲突
+最自然的后续方向有：
 
-### 前端
-- **`src/styles/shared.ts`**（新文件）：`sharedInputStyle` + `sharedBackLinkStyle`
-- **`src/components/ui/Field.tsx`**（新文件）：通用表单字段包装组件
-- **`CreateListingPage.tsx`** / **`EditListingPage.tsx`**：改用 `Field` 组件 + `sharedInputStyle`，消除重复代码
-
-### 容器化
-- **`docker-compose.yml`**（新文件）：postgres + backend + frontend 三服务，含 healthcheck、volume 持久化
-- **`backend/Dockerfile`**（新文件）：多阶段构建（build → production），启动时自动 `prisma migrate deploy`
-- **`frontend/Dockerfile`**（新文件）：Vite 构建 → nginx 提供静态文件
-- **`frontend/nginx.conf`**（新文件）：SPA 路由回退 + `/api` + `/uploads` 反向代理
-
-### 文档
-- **`README_DEV.md`**：全面重写，含 12 个章节（技术栈、依赖说明、所有功能实现细节、API 列表等）
-
----
-
-## Phase 3 变更记录（2026-03-22）
-
-### 后端
-- **`prisma/schema.prisma`**：新增 `ListingImage` 模型（含 `onDelete: Cascade`、`order` 字段）；`Listing` 新增 `images ListingImage[]` 关联
-- **迁移**：新增 `add_listing_image_model` migration
-- **`src/listings/dto/get-listings-query.dto.ts`**（新文件）：`search / condition / brand / minPrice / maxPrice / page / limit`，`enableImplicitConversion: true` 自动转换 query string 类型
-- **`src/listings/listings.service.ts`**：`findAll` 改为支持所有 query 参数，`Promise.all([findMany, count])` 并发，返回 `{ data, total, page, limit, totalPages }`
-- **`src/listings/images/`**（新目录）：`ImagesService`（Multer diskStorage + max 5 张 + 5MB + MIME 校验）、`ImagesController`、`ImagesModule`
-- **`src/app.module.ts`**：注册 `ServeStaticModule`（`./uploads/` → `/uploads`）
-
-### 前端
-- **`src/pages/ListingsPage.tsx`**：两套 state（`draftFilters` / `committedFilters`）；分页控件；搜索栏（关键词、成色、品牌、价格区间）
-- **`src/pages/ListingDetailPage.tsx`**：水平滚动图片卡片 + 删除按钮（仅 owner）；隐藏 file input 上传；超 5 张隐藏按钮
-- **`src/api/listings.ts`**：新增 `uploadImage` / `deleteImage` API 函数；`Listing` type 新增 `images` 字段；`PaginatedListings` 类型
-
----
-
-## Phase 2 变更记录（2026-03-21）
-
-### 后端
-- **`prisma/schema.prisma`**：新增 `BookingStatus` enum（pending/accepted/rejected/cancelled）、`Booking` 模型（含 `@@unique([listingId, buyerId])`）、User 和 Listing 反向关联
-- **迁移**：新增 `20260321060510_add_booking_model` migration
-- **`src/bookings/booking-status.enum.ts`**（新文件）：TypeScript enum，供 DTO/Service 使用（不从 generated client 导入）
-- **`src/bookings/dto/create-booking.dto.ts`**（新文件）：`message?: string`，`@MaxLength(500)`
-- **`src/bookings/dto/update-booking-status.dto.ts`**（新文件）：`@IsEnum(BookingStatus)`
-- **`src/bookings/bookings.service.ts`**（新文件）：create（400/404/409）、findByBuyer、findByListing（403）、updateStatus（状态机 + 所有权校验）
-- **`src/bookings/bookings.controller.ts`**（新文件）：4 条路由，`@Controller()` 无前缀以支持两种 URL 模式
-- **`src/bookings/bookings.module.ts`**（新文件）：注册 Service 和 Controller
-- **`src/app.module.ts`**：注册 `BookingsModule`
-
-### 前端
-- **`src/api/bookings.ts`**（新文件）：`BookingStatus` 类型、`Booking` interface、4 个 API 函数 + 401 interceptor
-- **`src/pages/MyBookingsPage.tsx`**（新文件）：买家的预约列表，按状态着色，pending 可取消
-- **`src/pages/ListingBookingsPage.tsx`**（新文件）：卖家查看某 listing 预约，可接受/拒绝
-- **`src/App.tsx`**：新增 `/bookings/mine`、`/listings/:id/bookings` 两条受保护路由
-- **`src/pages/ListingDetailPage.tsx`**：listing 详情页下方新增预约区块（卖家→管理链接；买家→预约表单；未登录→登录提示）
-- **`src/pages/MyListingsPage.tsx`**：每行新增"Bookings"按钮，跳转到该 listing 的预约管理页
-- **`src/pages/ListingsPage.tsx`**：头部新增"My Bookings"链接（仅登录用户可见）
-
----
-
-## Phase 1 变更记录（2026-03-21）
-
-### 后端
-- **`prisma/schema.prisma`**：新增 `enum Condition { new like_new good fair poor }`，`Listing.condition` 从 `String` 改为 `Condition`
-- **迁移**：新增 `20260321054941_add_condition_enum` migration
-- **`src/listings/condition.enum.ts`**（新文件）：TypeScript enum，与 Prisma enum 保持同步，供 DTO 使用
-- **`src/listings/dto/create-listing.dto.ts`**：`@IsIn` → `@IsEnum(Condition)`，去除 `VALID_CONDITIONS` 常量
-- **`src/listings/dto/update-listing.dto.ts`**：同上
-
-### 前端
-- **`src/constants/conditions.ts`**（新文件）：`CONDITIONS` 数组（含 value/label）+ `CONDITION_LABELS` map + `ListingCondition` 类型 —— 整个前端的单一数据源
-- **`src/api/listings.ts`**：`ListingCondition` 从 `constants/conditions` 导入（不再在此处定义）；新增 **401 response interceptor**：token 过期时自动清除 localStorage 并跳转 `/login`
-- **`CreateListingPage.tsx` / `EditListingPage.tsx`**：`CONDITIONS` 从 `constants/conditions` 导入，去除本地重复定义
-- **`ListingsPage.tsx` / `ListingDetailPage.tsx` / `MyListingsPage.tsx`**：`condition.replace('_', ' ')` → `CONDITION_LABELS[listing.condition]`，显示规范化标签（如 "Like New"）
-
----
-
+1. Stripe 本地联调收尾
+   - 配齐 webhook secret
+   - 跑通一次真实 checkout -> webhook -> paid -> complete
+2. 更新 README / README_DEV 到当前 Stripe 阶段
+3. provider 级部署说明（优先 Railway）
+4. Stripe Connect / marketplace payout 设计

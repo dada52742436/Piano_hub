@@ -1,7 +1,7 @@
 import { api } from './client';
 import type { Transaction } from './transactions';
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
 
 export interface Payment {
   id: number;
@@ -9,7 +9,9 @@ export interface Payment {
   buyerId: number;
   amount: number;
   provider: string;
+  providerCheckoutSessionId: string | null;
   providerPaymentId: string | null;
+  checkoutUrl: string | null;
   status: PaymentStatus;
   paidAt: string | null;
   createdAt: string;
@@ -34,6 +36,13 @@ export async function createPayment(
   payload: { amount: number; providerPaymentId?: string },
 ): Promise<Payment> {
   const { data } = await api.post<Payment>(`/transactions/${transactionId}/payments`, payload);
+  return data;
+}
+
+export async function createStripeCheckoutSession(transactionId: number): Promise<Payment> {
+  const { data } = await api.post<Payment>(
+    `/transactions/${transactionId}/payments/checkout-session`,
+  );
   return data;
 }
 

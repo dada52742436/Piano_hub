@@ -58,4 +58,13 @@ export class TransactionsController {
   ) {
     return this.transactionsService.updateStatus(id, dto.status, req.user.id);
   }
+
+  @Patch('transactions/:id/refund')
+  @UseGuards(JwtAuthGuard)
+  sellerRefund(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.transactionsService.sellerRefund(id, req.user.id);
+  }
 }
